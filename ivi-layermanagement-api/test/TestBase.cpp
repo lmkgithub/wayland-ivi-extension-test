@@ -34,11 +34,28 @@ TestBase::TestBase()
         throw std::runtime_error("wl_display error");
     }
 
-    wlSurfaces.reserve(10);
+    wlSurfaces.reserve(16);
     for (int i = 0; i < wlSurfaces.capacity(); ++i)
     {
         wlSurfaces.push_back(wl_compositor_create_surface(wlCompositor));
     }
+
+    nextSurfaceId = 300;
+    nextLayerId = 60;
+}
+
+t_ilm_surface TestBase::getSurface()
+{
+    t_ilm_surface returned_surface = nextSurfaceId;
+    nextSurfaceId++;
+    return (returned_surface);
+}
+
+t_ilm_layer TestBase::getLayer()
+{
+    t_ilm_layer returned_layer = nextLayerId;
+    nextLayerId++;
+    return (returned_layer);
 }
 
 TestBase::~TestBase()
