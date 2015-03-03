@@ -34,11 +34,12 @@ TestBase::TestBase()
         throw std::runtime_error("wl_display error");
     }
 
-    wlSurfaces.reserve(10);
+    wlSurfaces.reserve(30);
     for (int i = 0; i < wlSurfaces.capacity(); ++i)
     {
         wlSurfaces.push_back(wl_compositor_create_surface(wlCompositor));
     }
+
 }
 
 TestBase::~TestBase()
@@ -55,3 +56,9 @@ TestBase::~TestBase()
     wl_display_disconnect(wlDisplay);
 }
 
+t_ilm_surface TestBase::nextSurfaceId = 300;
+t_ilm_layer TestBase::nextLayerId = 60;
+t_ilm_surface TestBase::maxSurfaceId = 100;
+t_ilm_layer TestBase::maxLayerId = 100;
+t_ilm_surface TestBase::startSurfaceId = 300;
+t_ilm_layer TestBase::startLayerId = 60;
