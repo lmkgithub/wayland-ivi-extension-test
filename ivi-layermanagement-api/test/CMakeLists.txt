@@ -31,6 +31,8 @@ ENDIF()
 
 IF(BUILD_ILM_API_TESTS)
 
+    add_subdirectory( ${CMAKE_CURRENT_SOURCE_DIR}/multi_client )
+
     PROJECT(ivi-layermanagement-api-test)
 
     INCLUDE_DIRECTORIES(
