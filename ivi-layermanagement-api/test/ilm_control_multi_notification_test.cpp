@@ -3109,6 +3109,264 @@ TEST_F(IlmMultiNotificationTest, ilm_multiDoNotSendNotificationsAfterRemoveLayer
 }
 
 
+TEST_F(IlmMultiNotificationTest, ilm_multipleRegistrationsLayer)
+{
+    uint no_surfaces = 8;
+    uint no_layers = 2;
+
+    e_ilmOrientation orientations[4] = {ILM_ZERO, ILM_NINETY,
+                                        ILM_ONEHUNDREDEIGHTY,
+                                        ILM_TWOHUNDREDSEVENTY};
+
+    t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+    // Create surfaces
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId = getSurface();
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surface->surfaceProperties.origSourceWidth = 31 * (i + 1);
+        surface->surfaceProperties.origSourceHeight = 42 * (i + 1);
+
+        ASSERT_EQ(ILM_SUCCESS, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i], 
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        surfaces_allocated.push_back(*surface);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of surfaces
+    for (uint i = 0; i < no_surfaces; i++)
+    {
+        t_ilm_uint surf_dim[2] = {surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                  surfaces_allocated[i].surfaceProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId, surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Create layers
+    for (int i = 0; i < no_layers; i++)
+    {
+        layer_def * layer = new layer_def;
+        layer->layerId = getLayer();
+        layer->layerProperties.origSourceWidth = 198 * (i + 1);
+        layer->layerProperties.origSourceHeight = 232 * (i + 1);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        layers_allocated.push_back(*layer);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        assertNoCallbackIsCalled();
+    }
+
+    // Set position of layers
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint layer_pos[2] = { 22 + (i * 5), 42 + (i * 5) };
+        layers_allocated[i].layerProperties.sourceX = layer_pos[0];
+        layers_allocated[i].layerProperties.sourceY = layer_pos[1];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetPosition(layers_allocated[i].layerId,
+                  layer_pos));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        assertNoCallbackIsCalled();
+    }
+
+    // Add notifications to layers
+    for (int i = 0; i < layers_allocated.size(); i++)
+    {
+        // add notification
+        ilmErrorTypes status = ilm_layerAddNotification(layers_allocated[i].layerId,&LayerCallbackFunction);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        ASSERT_EQ(ILM_SUCCESS, status);
+    }
+
+    // Set Orientation of layers check callbacks
+    for (int i = 0; i < no_layers; i++)
+    {
+        callbackLayerId = layers_allocated[i].layerId;
+        layers_allocated[i].layerProperties.orientation = orientations[i % 4];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOrientation(layers_allocated[i].layerId,
+                  layers_allocated[i].layerProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        // expect callback to have been called
+        assertCallbackcalled();
+        EXPECT_EQ(layers_allocated[i].layerId, callbackLayerId);
+    }
+
+    // Remove notification from one layer
+    // Change orientation on layer
+    // Confirm no callback is made
+    // Add callback back, confirm it's back
+    for (int i = 0; i < no_layers; i++)
+    {
+        callbackLayerId = layers_allocated[i].layerId;
+        // At the minute this seems to effect the other layer as well - error
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOrientation(layers_allocated[i].layerId,
+                  layers_allocated[i].layerProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        assertNoCallbackIsCalled();
+
+        for (int j = i + 1; j < no_layers; j++)
+        {
+            // Confirm another layer still has call back
+            callbackLayerId = layers_allocated[j].layerId;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetOrientation(layers_allocated[j].layerId,
+                      layers_allocated[j].layerProperties.orientation));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+            // expect callback to have been called
+            assertCallbackcalled(layers_allocated[j].layerId);
+            EXPECT_EQ(layers_allocated[j].layerId, callbackLayerId);
+        }
+    }
+
+    // Return notifications to layers
+    for (int i = 0; i < layers_allocated.size(); i++)
+    {
+        // add notification
+std::cout << "Adding Notification for layer Id: " << layers_allocated[i].layerId << std::endl;
+        ilmErrorTypes status = ilm_layerAddNotification(layers_allocated[i].layerId,&LayerCallbackFunction);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        ASSERT_EQ(ILM_SUCCESS, status);
+    }
+
+    // Add surfaces to layers check notifications are back
+    for (int i = 0; i < no_layers; i++)
+    {
+        callbackLayerId = layers_allocated[i].layerId;
+
+        for (int j = i * (no_surfaces / no_layers);
+             j < ((i + 1) * (no_surfaces / no_layers));
+             j++)
+        {
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerAddSurface(layers_allocated[i].layerId,
+                      surfaces_allocated[j].returnedSurfaceId));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetOrientation(layers_allocated[i].layerId,
+                      layers_allocated[i].layerProperties.orientation));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+            // expect callback to have been called
+            assertCallbackcalled();
+            EXPECT_EQ(layers_allocated[i].layerId, callbackLayerId);
+        }
+    }
+
+    // remove the layers
+    for (int i = 0; i < no_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        EXPECT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        EXPECT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining layers and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+            uint index = no_layers;
+
+            for (int k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId) index = k;
+            }
+
+            if (index != no_layers)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                callbackLayerId = layers_allocated[index].layerId;
+                EXPECT_EQ(ILM_SUCCESS, ilm_layerGetDimension(layerIDs[j], dimreturned));
+
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth, dimreturned[0]);
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight, dimreturned[1]);
+
+
+                // Confirm orientation
+                e_ilmOrientation orientation_rtn;
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_layerGetOrientation(layers_allocated[index].layerId,
+                          &orientation_rtn));
+                EXPECT_EQ(layers_allocated[index].layerProperties.orientation,
+                          orientation_rtn);
+
+                // Change something
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_layerSetVisibility(layers_allocated[index].layerId,
+                          layers_allocated[index].layerProperties.visibility));
+                ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+                // expect callback to have been called
+                assertCallbackcalled();
+                EXPECT_EQ(layers_allocated[index].layerId,callbackLayerId);
+            }
+        }
+    }
+
+    layers_allocated.clear();
+
+    // Loop through surfaces and remove
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+            uint index = no_surfaces;
+
+            for (int k = 0; k < surfaces_allocated.size(); k++)
+            {
+                if (surfaceIDs[j] == surfaces_allocated[k].returnedSurfaceId) index = k;
+            }
+
+            if (index != no_surfaces)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                ilmSurfaceProperties returnValue;
+                EXPECT_EQ(ILM_SUCCESS, ilm_surfaceGetDimension(surfaceIDs[j], dimreturned));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceWidth,
+                          dimreturned[0]);
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceHeight,
+                          dimreturned[1]);
+
+            }
+        }
+    }
+
+    surfaces_allocated.clear();
+}
+
+
 TEST_F(IlmMultiNotificationTest, ilm_multiNotifyOnSurfaceSetPosition)
 {
     uint no_surfaces = 4;
