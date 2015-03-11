@@ -6547,6 +6547,376 @@ TEST_F(IlmMultiNotificationTest, ilm_multiMultipleRegistrationsSurface)
     surfaces_allocated.clear();
 }
 
+TEST_F(IlmMultiNotificationTest, ilm_multiDefaultIsNotToReceiveNotificationsSurface)
+{
+    uint no_surfaces = 4;
+    uint no_layers = 2;
+
+    e_ilmOrientation orientations[4] = {ILM_ZERO, ILM_NINETY,
+                                        ILM_ONEHUNDREDEIGHTY,
+                                        ILM_TWOHUNDREDSEVENTY};
+
+    t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+    // Create surfaces
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId = getSurface();
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surface->surfaceProperties.origSourceWidth = 16 * (i + 1);
+        surface->surfaceProperties.origSourceHeight = 28 * (i + 1);
+
+        ASSERT_EQ(ILM_SUCCESS, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i], 
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        surfaces_allocated.push_back(*surface);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of surfaces
+    for (uint i = 0; i < no_surfaces; i++)
+    {
+        t_ilm_uint surf_dim[2] = {surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                  surfaces_allocated[i].surfaceProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId, surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set Opacity of surfaces
+    for (int i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surfaces_allocated[i].surfaceProperties.opacity = 0.15 + (i * 0.15);
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set Visibility
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        surfaces_allocated[i].surfaceProperties.visibility = visibility[no_layers % 2];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.visibility));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set Orientation of surfaces
+    for (int i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surfaces_allocated[i].surfaceProperties.orientation = orientations[ i % 4 ];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle and check callback
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surface = surfaces_allocated[i].returnedSurfaceId;
+        t_ilm_uint surf_dim[2] = { 41 + (i * 5), 19 + (i * 5) };
+
+        surfaces_allocated[i].surfaceProperties.destX = 3 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.destY = 2 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.destWidth = 50 + (i * 10);
+        surfaces_allocated[i].surfaceProperties.destHeight = 55 + (i * 10);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[i].returnedSurfaceId,
+                                                surfaces_allocated[i].surfaceProperties.destX,
+                                                surfaces_allocated[i].surfaceProperties.destY,
+                                                surfaces_allocated[i].surfaceProperties.destWidth,
+                                                surfaces_allocated[i].surfaceProperties.destHeight));
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+
+    // Set source rectangle and check callback
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        callbackSurfaceId = surfaces_allocated[i].returnedSurfaceId;
+
+        surfaces_allocated[i].surfaceProperties.sourceX = 8 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.sourceY = 3 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.sourceWidth = 51 + (i * 10);
+        surfaces_allocated[i].surfaceProperties.sourceHeight = 52 + (i * 10);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[i].returnedSurfaceId,
+                                                surfaces_allocated[i].surfaceProperties.sourceX,
+                                                surfaces_allocated[i].surfaceProperties.sourceY,
+                                                surfaces_allocated[i].surfaceProperties.sourceWidth,
+                                                surfaces_allocated[i].surfaceProperties.sourceHeight));
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Create layers
+    for (int i = 0; i < no_layers; i++)
+    {
+        layer_def * layer = new layer_def;
+        layer->layerId = getLayer();
+        layer->layerProperties.origSourceWidth = 198 * (i + 1);
+        layer->layerProperties.origSourceHeight = 232 * (i + 1);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        layers_allocated.push_back(*layer);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set position of layers
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint surf_pos[2] = { 22 + (i * 5), 42 + (i * 5) };
+        layers_allocated[i].layerProperties.sourceX = surf_pos[0];
+        layers_allocated[i].layerProperties.sourceY = surf_pos[1];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetPosition(layers_allocated[i].layerId,
+                  surf_pos));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // assert that we have not been notified
+    assertNoCallbackIsCalled();
+
+    // Add surfaces to layers check notifications
+    for (int i = 0; i < no_layers; i++)
+    {
+        for (int j = i * (no_surfaces / no_layers);
+             j < ((i + 1) * (no_surfaces / no_layers));
+             j++)
+        {
+            layer = layers_allocated[i].layerId;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerAddSurface(layers_allocated[i].layerId,
+                      surfaces_allocated[j].returnedSurfaceId));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        }
+    }
+
+    // Change Opacity of surfaces
+    for (int i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surfaces_allocated[i].surfaceProperties.opacity = 0.35 + (i * 0.15);
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Change Visibility
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        surfaces_allocated[i].surfaceProperties.visibility = visibility[ no_layers % 2 ];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.visibility));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Change Orientation of surfaces
+    for (int i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surfaces_allocated[i].surfaceProperties.orientation = orientations[ i % 4 ];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Change destination rectangle and check callback
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surface = surfaces_allocated[i].returnedSurfaceId;
+
+        surfaces_allocated[i].surfaceProperties.destX = 7 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.destY = 2 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.destWidth = 54 + (i * 10);
+        surfaces_allocated[i].surfaceProperties.destHeight = 51 + (i * 10);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDestinationRectangle(surfaces_allocated[i].returnedSurfaceId,
+                                                     surfaces_allocated[i].surfaceProperties.destX,
+                                                     surfaces_allocated[i].surfaceProperties.destY,
+                                                     surfaces_allocated[i].surfaceProperties.destWidth,
+                                                     surfaces_allocated[i].surfaceProperties.destHeight));
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+
+    // Change source rectangle and check callback
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        callbackSurfaceId = surfaces_allocated[i].returnedSurfaceId;
+
+        surfaces_allocated[i].surfaceProperties.sourceX = 9 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.sourceY = 7 + (i * 5);
+        surfaces_allocated[i].surfaceProperties.sourceWidth = 52 + (i * 10);
+        surfaces_allocated[i].surfaceProperties.sourceHeight = 58 + (i * 10);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[i].returnedSurfaceId,
+                                                surfaces_allocated[i].surfaceProperties.sourceX,
+                                                surfaces_allocated[i].surfaceProperties.sourceY,
+                                                surfaces_allocated[i].surfaceProperties.sourceWidth,
+                                                surfaces_allocated[i].surfaceProperties.sourceHeight));
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // assert that we have not been notified
+    assertNoCallbackIsCalled();
+
+    // remove the layers
+    for (int i = 0; i < no_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        EXPECT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        EXPECT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining layers and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+            uint index = no_layers;
+
+            for (int k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId) index = k;
+            }
+
+            if (index != no_layers)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                EXPECT_EQ(ILM_SUCCESS, ilm_layerGetDimension(layerIDs[j], dimreturned));
+
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth, dimreturned[0]);
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight, dimreturned[1]);
+            }
+        }
+    }
+
+    layers_allocated.clear();
+
+    // Loop through surfaces and remove
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+            uint index = no_surfaces;
+
+            for (int k = 0; k < surfaces_allocated.size(); k++)
+            {
+                if (surfaceIDs[j] == surfaces_allocated[k].returnedSurfaceId) index = k;
+            }
+
+            if (index != no_surfaces)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                ilmSurfaceProperties returnValue;
+                callbackSurfaceId = surfaces_allocated[index].returnedSurfaceId;
+
+                EXPECT_EQ(ILM_SUCCESS, ilm_surfaceGetDimension(surfaceIDs[j], dimreturned));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.destWidth,
+                          dimreturned[0]);
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.destHeight,
+                          dimreturned[1]);
+
+                // Confirm destination rectangle
+                ilmSurfaceProperties surfaceProperties;
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_getPropertiesOfSurface(surfaceIDs[j],
+                                                   &surfaceProperties));
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.destX,
+                          surfaceProperties.destX);
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.destY,
+                          surfaceProperties.destY);
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.destWidth,
+                          surfaceProperties.destWidth);
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.destHeight,
+                          surfaceProperties.destHeight);
+                // Confirm source rectangle
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.sourceX,
+                          surfaceProperties.sourceX);
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.sourceY,
+                          surfaceProperties.sourceY);
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.sourceWidth,
+                          surfaceProperties.sourceWidth);
+                ASSERT_EQ(surfaces_allocated[index].surfaceProperties.sourceHeight,
+                          surfaceProperties.sourceHeight);
+
+                // Confirm opacity
+                t_ilm_float returned;
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_surfaceGetOpacity(surfaceIDs[j],
+                          &returned));
+                EXPECT_NEAR(surfaces_allocated[index].surfaceProperties.opacity,
+                            returned, 0.01);
+
+                // Confirm visibility
+                t_ilm_bool visibility_rtn;
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_surfaceGetVisibility(surfaceIDs[j],
+                          &visibility_rtn));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.visibility,
+                            visibility_rtn);
+
+                // Confirm orientation
+                e_ilmOrientation orientation_rtn;
+                EXPECT_EQ(ILM_SUCCESS, ilm_surfaceGetOrientation(callbackSurfaceId, &orientation_rtn));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.orientation,
+                            orientation_rtn);
+
+                // Change something that has been pre-set and check no callback is called
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_surfaceSetOrientation(surfaceIDs[j],
+                          surfaces_allocated[index].surfaceProperties.orientation));
+
+                EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+                // expect callback to have been called
+                assertNoCallbackIsCalled();
+
+
+            }
+        }
+    }
+
+    surfaces_allocated.clear();
+}
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
