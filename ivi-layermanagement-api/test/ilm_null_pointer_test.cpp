@@ -421,3 +421,126 @@ TEST_F(IlmNullPointerTest, ilm_testSurfaceCreateDimensionNullPointer)
 
     surfaces_allocated.clear();
 }
+
+TEST_F(IlmNullPointerTest, ilm_testLayerCreateDimensionNullPointer)
+{
+    uint no_layers = 4;
+
+    // Try to create layers using null ptr for id ref.
+    for (uint i = 0; i < no_layers; i++)
+    {
+        layer_def * layer = new layer_def;
+        layer->layerId = getLayer();
+        layer->layerProperties.origSourceWidth = 150 + ( i * 10 );
+        layer->layerProperties.origSourceHeight = 250 + ( i + 10 );
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_FAILED,
+                  ilm_layerCreateWithDimension(NULL,
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Now try to create layers with valid id ref.
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layers_allocated[i].layerId),
+                                               layers_allocated[i].layerProperties.origSourceWidth,
+                                               layers_allocated[i].layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of layers using null pointer
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_FAILED,
+                  ilm_layerSetDimension(layers_allocated[i].layerId, NULL));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of layers using valid pointer
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint surf_dim[2] = {layers_allocated[i].layerProperties.origSourceWidth,
+                                  layers_allocated[i].layerProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDimension(layers_allocated[i].layerId,
+                                        surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check parameters
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint dim_rtn[2] = {0, 0};
+
+        // Confirm dimension
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerGetDimension(layers_allocated[i].layerId,
+                  dim_rtn));
+
+        EXPECT_EQ(layers_allocated[i].layerProperties.origSourceWidth, dim_rtn[0]);
+        EXPECT_EQ(layers_allocated[i].layerProperties.origSourceHeight, dim_rtn[1]);
+    }
+
+    // Loop through layers and remove
+    uint num_layers = layers_allocated.size();
+
+    for (uint i = 0; i < num_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining layers and confirm dimensions are unchanged
+        for (uint j = 0; j < length; j++)
+        {
+            uint index = num_layers;
+
+            for (uint k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != num_layers)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                t_ilm_uint surf_pos[2] = {0, 0};
+                ilmLayerProperties returnValue;
+                EXPECT_EQ(ILM_SUCCESS, ilm_layerGetDimension(layerIDs[j], dimreturned));
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth,
+                          dimreturned[0]);
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight,
+                          dimreturned[1]);
+
+                // Change something that has been pre-set and check callback
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_layerSetVisibility(layers_allocated[index].layerId,
+                          ILM_TRUE));
+
+                // expect callback to have been called
+                assertNoCallbackIsCalled();
+            }
+        }
+
+        layerIDs.clear();
+    }
+
+    layers_allocated.clear();
+}
