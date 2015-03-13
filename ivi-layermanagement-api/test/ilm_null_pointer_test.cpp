@@ -290,3 +290,132 @@ struct ilmLayerProperties IlmNullPointerTest::LayerProperties;
 unsigned int IlmNullPointerTest::mask;
 t_ilm_surface IlmNullPointerTest::surface;
 ilmSurfaceProperties IlmNullPointerTest::SurfaceProperties;
+
+TEST_F(IlmNullPointerTest, ilm_testSurfaceCreateDimensionNullPointer)
+{
+    uint no_surfaces = 4;
+
+    // Try to create surfaces using null ptr for id ref.
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId = getSurface();
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surface->surfaceProperties.origSourceWidth = 150 + ( i * 10 );
+        surface->surfaceProperties.origSourceHeight = 250 + ( i + 10 );
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_FAILED, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i], 
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     NULL));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Now try to create surfaces with valid id ref.
+    for (int i = 0; i < surfaces_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i], 
+                                     surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                     surfaces_allocated[i].surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surfaces_allocated[i].returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of surfaces using null pointer
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_FAILED, ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId, NULL));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of surfaces using valid pointer
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint surf_dim[2] = {surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                  surfaces_allocated[i].surfaceProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId,
+                                          surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check parameters
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint dim_rtn[2] = {0, 0};
+
+        // Confirm dimension
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_surfaceGetDimension(surfaces_allocated[i].returnedSurfaceId,
+                  dim_rtn));
+
+        EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                  dim_rtn[0]);
+        EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceHeight,
+                  dim_rtn[1]);
+    }
+
+    // Loop through surfaces and remove
+    for (int i = 0; i < no_surfaces; i++)
+    {
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+            uint index = no_surfaces;
+
+            for (int k = 0; k < surfaces_allocated.size(); k++)
+            {
+                if (surfaceIDs[j] == surfaces_allocated[k].returnedSurfaceId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != no_surfaces)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                t_ilm_uint surf_pos[2] = {0, 0};
+                ilmSurfaceProperties returnValue;
+                EXPECT_EQ(ILM_SUCCESS, ilm_surfaceGetDimension(surfaceIDs[j], dimreturned));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceWidth,
+                          dimreturned[0]);
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceHeight,
+                          dimreturned[1]);
+
+                // Change something that has been pre-set and check callback
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_surfaceSetVisibility(surfaces_allocated[index].returnedSurfaceId,
+                          ILM_TRUE));
+
+                // expect callback to have been called
+                assertNoCallbackIsCalled();
+            }
+        }
+
+        surfaceIDs.clear();
+    }
+
+    surfaces_allocated.clear();
+}
