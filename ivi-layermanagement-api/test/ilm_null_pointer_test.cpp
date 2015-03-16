@@ -1301,3 +1301,113 @@ TEST_F(IlmNullPointerTest, ilm_getSurfaceIDsNullPointer) {
     surfaces_allocated.clear();
 }
 
+TEST_F(IlmNullPointerTest, ilm_layerGetCapabilitiesNullPointer) {
+
+    uint no_layers = 4;
+
+    // Try to create layers
+    for (int i = 0; i < no_layers; i++)
+    {
+        layer_def * layer = new layer_def;
+        layer->layerId = getLayer();
+        layer->layerProperties.origSourceWidth = 180 + ( i * 10 );
+        layer->layerProperties.origSourceHeight = 285 + ( i + 10 );
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of layers using valid pointer
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint surf_dim[2] = {layers_allocated[i].layerProperties.origSourceWidth,
+                                  layers_allocated[i].layerProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDimension(layers_allocated[i].layerId,
+                                        surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check capabilities using null pointer
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_FAILED,
+                  ilm_layerGetCapabilities(layers_allocated[i].layerId,
+                                           NULL));
+    }
+
+    // Check capabilities using real pointer
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_layercapabilities caps;
+        t_ilm_layercapabilities exp_caps = 0;
+
+        // Still expecting failure currently
+        ASSERT_EQ(ILM_FAILED,
+                  ilm_layerGetCapabilities(layers_allocated[i].layerId,
+                                           &caps));
+        ASSERT_EQ(exp_caps, caps);
+    }
+
+    // Loop through layers and remove
+    for (int i = 0; i < no_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining layers and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+            uint index = no_layers;
+
+            for (int k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != no_layers)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                t_ilm_uint surf_pos[2] = {0, 0};
+                ilmLayerProperties returnValue;
+                EXPECT_EQ(ILM_SUCCESS, ilm_layerGetDimension(layerIDs[j], dimreturned));
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth,
+                          dimreturned[0]);
+                EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight,
+                          dimreturned[1]);
+
+                // Change something that has been pre-set and check callback
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_layerSetVisibility(layers_allocated[index].layerId,
+                          ILM_TRUE));
+
+                // expect callback to have been called
+                assertNoCallbackIsCalled();
+            }
+        }
+
+        layerIDs.clear();
+    }
+
+    layers_allocated.clear();
+}
