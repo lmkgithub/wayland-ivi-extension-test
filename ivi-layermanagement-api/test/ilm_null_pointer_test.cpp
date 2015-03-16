@@ -1411,3 +1411,42 @@ TEST_F(IlmNullPointerTest, ilm_layerGetCapabilitiesNullPointer) {
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmNullPointerTest, ilm_layerTypeGetCapabilitiesNullPointer) {
+
+    t_ilm_layercapabilities caps = 0;
+    // TODO: unsupported
+    t_ilm_layercapabilities exp_caps = 0;
+
+    // check ILM_LAYERTYPE_UNKNOWN with NULL pointer
+    ASSERT_EQ(ILM_FAILED, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_UNKNOWN, NULL));
+    ASSERT_EQ(exp_caps, caps);
+
+    // check ILM_LAYERTYPE_UNKNOWN with valid pointer
+    ASSERT_EQ(ILM_SUCCESS, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_UNKNOWN, &caps));
+    ASSERT_EQ(exp_caps, caps);
+
+    // check ILM_LAYERTYPE_HARDWARE with NULL pointer
+    ASSERT_EQ(ILM_FAILED, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_HARDWARE, NULL));
+    ASSERT_EQ(exp_caps, caps);
+
+    // check ILM_LAYERTYPE_HARDWARE with valid pointer
+    ASSERT_EQ(ILM_SUCCESS, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_HARDWARE, &caps));
+    ASSERT_EQ(exp_caps, caps);
+
+    // check ILM_LAYERTYPE_SOFTWARE2D with NULL pointer
+    ASSERT_EQ(ILM_FAILED, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_SOFTWARE2D, NULL));
+    ASSERT_EQ(exp_caps, caps);
+
+    // check ILM_LAYERTYPE_SOFTWARE2D with valid pointer
+    ASSERT_EQ(ILM_SUCCESS, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_SOFTWARE2D, &caps));
+    ASSERT_EQ(exp_caps, caps);
+
+    // check ILM_LAYERTYPE_SOFTWARE2_5D with NULL pointer
+    ASSERT_EQ(ILM_FAILED, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_SOFTWARE2_5D, NULL));
+    ASSERT_EQ(exp_caps, caps);
+
+    // check ILM_LAYERTYPE_SOFTWARE2_5D with valid pointer
+    ASSERT_EQ(ILM_SUCCESS, ilm_layerTypeGetCapabilities(ILM_LAYERTYPE_SOFTWARE2_5D, &caps));
+    ASSERT_EQ(exp_caps, caps);
+}
