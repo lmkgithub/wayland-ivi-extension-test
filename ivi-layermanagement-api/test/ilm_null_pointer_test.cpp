@@ -1309,3 +1309,78 @@ TEST_F(IlmNullPointerTest, ilm_getSurfaceIDsNullPointer) {
 
     surfaces_allocated.clear();
 }
+
+TEST_F(IlmNullPointerTest, ilm_surface_initializeNullPointer) {
+
+    uint no_surfaces = 4;
+
+    // Create surfaces refs.
+    for (uint i = 0; i < no_surfaces; i++)
+    {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId = getSurface();
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surfaces_allocated.push_back(*surface);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+
+    // Try to initialise surfaces with null pointer
+    // Set dimensions of surfaces using valid pointer
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_FAILED, ilm_surfaceInitialize(NULL));
+    }
+
+    // Now try to initialise using valid pointers
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceInitialize(&(surfaces_allocated[i].returnedSurfaceId)));
+    }
+
+    // Check sizes and ID's
+    {
+        t_ilm_int length;
+        t_ilm_uint* IDs;
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        std::vector<t_ilm_surface> surfaceIDs;
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        EXPECT_EQ(surfaceIDs.size(), surfaces_allocated.size());
+        if (length == surfaces_allocated.size())
+        {
+            for (uint i = 0; i < surfaceIDs.size(); i++)
+            {
+                bool found = false;
+                for (uint j = 0; j < surfaces_allocated.size(); j++)
+                {
+                    if (surfaces_allocated[j].returnedSurfaceId
+                        == surfaceIDs[i])
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                EXPECT_EQ(found, true) << "Surface Id: "
+                                       << surfaceIDs[i]
+                                       << ", not found" << std::endl;
+            }
+        }
+        surfaceIDs.clear();
+    }
+
+    uint total_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (uint i = 0; i < total_surfaces; i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    surfaces_allocated.clear();
+}
