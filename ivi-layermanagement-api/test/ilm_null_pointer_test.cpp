@@ -2255,3 +2255,119 @@ TEST_F(IlmNullPointerTest, ilm_takeSurfaceScreenshotNullPointer) {
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemove(surfaces_allocated[0].returnedSurfaceId));
     surfaces_allocated.clear();
 }
+
+TEST_F(IlmNullPointerTest, ilm_surfaceGetPixelformatNullPointer) {
+
+    uint no_surfaces = 7;
+    const uint no_formats = 7;
+
+    ilmPixelFormat pixelFormats[no_formats] = {ILM_PIXELFORMAT_RGBA_4444,
+                                               ILM_PIXELFORMAT_RGBA_5551,
+                                               ILM_PIXELFORMAT_RGBA_6661,
+                                               ILM_PIXELFORMAT_RGBA_8888,
+                                               ILM_PIXELFORMAT_RGB_565,
+                                               ILM_PIXELFORMAT_RGB_888,
+                                               ILM_PIXELFORMAT_R_8};
+
+    // Create surfaces
+    for (uint i = 0; i < no_surfaces; i++)
+    {
+         surface_def * surface = new surface_def;
+         surface->requestedSurfaceId = getSurface();
+         surface->returnedSurfaceId = surface->requestedSurfaceId;
+         surface->surfaceProperties.origSourceWidth = 15 * (i + 1);
+         surface->surfaceProperties.origSourceHeight = 25 * (i + 1);
+
+         ASSERT_EQ(ILM_SUCCESS,
+                   ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i],
+                                      surface->surfaceProperties.origSourceWidth,
+                                      surface->surfaceProperties.origSourceHeight,
+                                      pixelFormats[i % no_formats],
+                                      &(surface->returnedSurfaceId)));
+
+         surfaces_allocated.push_back(*surface);
+         ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+     }
+
+    std::vector<ilmPixelFormat> pixelSet;
+
+    // Try to get pixel formats using null pointer
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+         ASSERT_EQ(ILM_FAILED,
+                   ilm_surfaceGetPixelformat(surfaces_allocated[i].returnedSurfaceId,
+                   NULL));
+    }
+
+    // Get pixel formats
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+         ilmPixelFormat * newPixelFormat = new ilmPixelFormat;
+
+         ASSERT_EQ(ILM_SUCCESS,
+                   ilm_surfaceGetPixelformat(surfaces_allocated[i].returnedSurfaceId,
+                   newPixelFormat));
+
+         pixelSet.push_back(*newPixelFormat);
+    }
+
+    // Check pixel formats
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        EXPECT_EQ(pixelFormats[i % no_formats], pixelSet[i]);
+    }
+
+    pixelSet.clear();
+
+    uint num_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (uint i = 0; i < num_surfaces; i++)
+    {
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (uint j = 0; j < length; j++)
+        {
+            uint index = num_surfaces;
+
+            for (uint k = 0; k < surfaces_allocated.size(); k++)
+            {
+                if (surfaceIDs[j] == surfaces_allocated[k].returnedSurfaceId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != num_surfaces)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_surfaceGetDimension(surfaceIDs[j], dimreturned));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceWidth,
+                          dimreturned[0]);
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceHeight,
+                          dimreturned[1]);
+
+            }
+        }
+
+        surfaceIDs.clear();
+    }
+
+    surfaces_allocated.clear();
+}
