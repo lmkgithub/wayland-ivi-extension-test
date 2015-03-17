@@ -2523,3 +2523,169 @@ TEST_F(IlmNullPointerTest, ilm_surfaceGetPixelformatNullPointer) {
 
     surfaces_allocated.clear();
 }
+
+TEST_F(IlmNullPointerTest, ilm_getPropertiesOfScreenNullPointer) {
+    t_ilm_uint numberOfScreens = 0;
+    t_ilm_uint* screenIDs = NULL;
+    uint no_layers = 4;
+    t_ilm_layer idRenderOrder[no_layers];
+    std::vector<t_ilm_uint> v_screenID;
+
+    // Try to get screen IDs using null pointer for numberOfScreens
+    ASSERT_EQ(ILM_FAILED, ilm_getScreenIDs(NULL, &screenIDs));
+
+    // Try to get screen IDs using valid pointer for numberOfScreens
+    ASSERT_EQ(ILM_SUCCESS, ilm_getScreenIDs(&numberOfScreens, &screenIDs));
+
+    v_screenID.assign(screenIDs, screenIDs + numberOfScreens);
+    free(screenIDs);
+
+    EXPECT_TRUE(numberOfScreens>0);
+
+    if (numberOfScreens > 0)
+    {
+        t_ilm_display screen = v_screenID[0];
+        ilmScreenProperties screenProperties;
+
+        // Create layers using null pointer
+        for (uint i = 0; i < no_layers; i++)
+        {
+            layer_def * layer = new layer_def;
+            layer->layerId = getLayer();
+            layer->layerProperties.origSourceWidth = 15 * (i + 1);
+            layer->layerProperties.origSourceHeight = 25 * (i + 1);
+            layers_allocated.push_back(*layer);
+            idRenderOrder[i] = layer->layerId;
+
+            EXPECT_EQ(ILM_SUCCESS,
+                      ilm_layerCreateWithDimension(&(layer->layerId),
+                                                   layer->layerProperties.origSourceWidth,
+                                                   layer->layerProperties.origSourceHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        }
+
+
+        // Try to set render order list with null pointer
+        // NOTE: THIS CURRENTLY CAUSES A SEGFAULT WHICH BRINGS ALL THE TESTS DOWN
+        // REINSTATE WHEN FIX IS PUT IN AND REMOVE MANUAL TEST THROW
+//        ASSERT_EQ(ILM_FAILED, ilm_displaySetRenderOrder(screen, NULL, no_layers));
+        EXPECT_EQ(ILM_SUCCESS, ILM_FAILED)
+                  << "Display render order with null pointer fails with "
+                  << "segfault, manual error result returned"
+                  << std::endl;
+
+        // Try to set render order list with real values
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_displaySetRenderOrder(screen, idRenderOrder, no_layers));
+
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Try to get screen properties using null pointer
+        EXPECT_EQ(ILM_ERROR_INVALID_ARGUMENTS,
+                  ilm_getPropertiesOfScreen(screen, NULL));
+
+        // Try to get screen using valid pointer
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfScreen(screen, &screenProperties));
+
+        // Confirm the number of layers - >= will work in multi-client
+        EXPECT_GE(screenProperties.layerCount, layers_allocated.size());
+
+        // Loop round and confirm that all layers are present
+        if (screenProperties.layerCount >= layers_allocated.size())
+        {
+            for (uint i = 0; i < layers_allocated.size(); i++)
+            {
+                bool found = false;
+
+                for (uint j = 0; j < screenProperties.layerCount; j++)
+                {
+                    if (screenProperties.layerIds[j]
+                        == layers_allocated[i].layerId)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                EXPECT_EQ(found, true) << "Layer: "
+                                       << layers_allocated[i].layerId
+                                       << ", not found in properties of screen: "
+                                       << screen << std::endl;
+            }
+        }
+        free(screenProperties.layerIds);
+
+        EXPECT_GT(screenProperties.screenWidth, 0u);
+        EXPECT_GT(screenProperties.screenHeight, 0u);
+
+        t_ilm_uint numberOfHardwareLayers;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_getNumberOfHardwareLayers(screen,
+                                                &numberOfHardwareLayers));
+        EXPECT_EQ(numberOfHardwareLayers, screenProperties.harwareLayerCount);
+    }
+
+    v_screenID.clear();
+
+    uint total_layers = layers_allocated.size();
+
+    // remove the layers
+    for (uint i = 0; i < total_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (uint j = 0; j < length; j++)
+        {
+
+            uint index = total_layers;
+
+            for (uint k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != total_layers)
+            {
+                // Iterate round remaining layers and check dimensions
+                for (uint k = 0; k < length; k++)
+                {
+                    t_ilm_uint dimreturned[2] = {0, 0};
+                    e_ilmOrientation orientation_returned;
+                    EXPECT_EQ(ILM_SUCCESS, ilm_layerGetDimension(layerIDs[j], dimreturned));
+
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth, dimreturned[0]);
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight, dimreturned[1]);
+
+                    // Change something that has been pre-set and check callback
+                    ASSERT_EQ(ILM_SUCCESS, ilm_layerSetVisibility(layers_allocated[index].layerId, ILM_TRUE));
+
+                    // expect callback to have been called
+                    assertNoCallbackIsCalled();
+
+                }
+            }
+        }
+
+        layerIDs.clear();
+    }
+
+    layers_allocated.clear();
+}
