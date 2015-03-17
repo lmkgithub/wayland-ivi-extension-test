@@ -2267,3 +2267,35 @@ TEST_F(IlmNullPointerTest,
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmNullPointerTest, ilm_takeScreenshotNullPointer) {
+    const char* outputFile = "/tmp/test.bmp";
+    // make sure the file is not there before
+    FILE* f = fopen(outputFile, "r");
+    if (f!=NULL){
+        fclose(f);
+        int result = remove(outputFile);
+        ASSERT_EQ(0, result);
+    }
+
+    // Try with NULL pointer - core dump - test aborts
+    // Manual failure added to prevent overall failure of
+    // test runner and Weston going into unknown state.
+    // Comment back in when resolved.
+//    ASSERT_EQ(ILM_FAILED, ilm_takeScreenshot(0, NULL));
+
+    // Add Manual error - remove once failure is resolved.
+    ASSERT_EQ(ILM_SUCCESS, ILM_FAILED)
+              << "IlmNullPointerTest."
+                 "ilm_takeScreenshotNullPointer: Failure with core dump "
+                 " manual error added. Remove once resolved.";
+
+    // Try with real pointer
+    ASSERT_EQ(ILM_SUCCESS, ilm_takeScreenshot(0, outputFile));
+
+    sleep(1);
+    f = fopen(outputFile, "r");
+    ASSERT_TRUE(f!=NULL);
+    fclose(f);
+    remove(outputFile);
+}
