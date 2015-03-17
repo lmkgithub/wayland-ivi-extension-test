@@ -2299,3 +2299,45 @@ TEST_F(IlmNullPointerTest, ilm_takeScreenshotNullPointer) {
     fclose(f);
     remove(outputFile);
 }
+
+TEST_F(IlmNullPointerTest, ilm_takeLayerScreenshotNullPointer) {
+    const char* outputFile = "/tmp/test.bmp";
+    // make sure the file is not there before
+    FILE* f = fopen(outputFile, "r");
+    if (f!=NULL){
+        fclose(f);
+        int result = remove(outputFile);
+        ASSERT_EQ(0, result);
+    }
+
+    layer_def * layer = new layer_def;
+    layer->layerId = getLayer();
+    layers_allocated.push_back(*layer);
+
+    ASSERT_EQ(ILM_SUCCESS,
+              ilm_layerCreateWithDimension(&(layer->layerId), 800, 480));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+    // Try with NULL pointer - core dump - test aborts
+    // Manual failure added to prevent overall failure of
+    // test runner and Weston going into unknown state.
+    // Comment back in when resolved.
+//    ASSERT_EQ(ILM_SUCCESS, ilm_takeLayerScreenshot(NULL, layer));
+
+    // Manual Failure added
+    ASSERT_EQ(ILM_SUCCESS, ILM_FAILED)
+              << "IlmNullPointerTest."
+                 "ilm_takeLayerScreenshotNullPointer: Failure with core dump "
+                 " manual error added. Remove once resolved.";
+
+    // Try with real pointer
+    ASSERT_EQ(ILM_SUCCESS, ilm_takeLayerScreenshot(outputFile, layer->layerId));
+
+    sleep(1);
+    f = fopen(outputFile, "r");
+    ASSERT_TRUE(f!=NULL);
+    fclose(f);
+    remove(outputFile);
+    ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layer->layerId));
+    layers_allocated.clear();
+}
