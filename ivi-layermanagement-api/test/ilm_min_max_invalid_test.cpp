@@ -2179,3 +2179,129 @@ TEST_F(IlmMinMaxInvalidTest, ilm_gmaxminSetSurfaceSourceRectangle)
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminGetLayerIDs)
+{
+    // Create layer with id 0
+    {
+        layer_def * layer = new layer_def;
+        // Force layer value - not multi-client safe
+        layer->layerId = 0;
+        layer->layerProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        layer->layerProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Create layer with id maximum value
+    // This is principle shouldn't be allowable since it equates to INVALID_ID?
+    {
+        layer_def * layer = new layer_def;
+        // Force layer value - not multi-client safe
+        layer->layerId = std::numeric_limits<t_ilm_uint>::max();
+        layer->layerProperties.origSourceWidth = std::numeric_limits<t_ilm_uint>::max();
+        layer->layerProperties.origSourceHeight = std::numeric_limits<t_ilm_uint>::max();
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_FAILED,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Removal shouldn't work since max id shouldn't be valid
+    {
+        EXPECT_EQ(ILM_FAILED,
+                  ilm_layerRemove(layers_allocated[1].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Remove from vector
+        layers_allocated.pop_back();
+    }
+
+    // Create layer with id maximum value - 1 - max permissable
+    {
+        layer_def * layer = new layer_def;
+        // Force layer value - not multi-client safe
+        layer->layerId = std::numeric_limits<t_ilm_uint>::max() - 1;
+        layer->layerProperties.origSourceWidth = std::numeric_limits<t_ilm_uint>::max();
+        layer->layerProperties.origSourceHeight = std::numeric_limits<t_ilm_uint>::max();
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_FAILED,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    uint total_layers = layers_allocated.size();
+
+    // remove the layers
+    for (uint i = 0; i < total_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (uint j = 0; j < length; j++)
+        {
+            uint index = total_layers;
+
+            for (uint k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != total_layers)
+            {
+                // Iterate round remaining layers and check dimensions
+                for (uint k = 0; k < length; k++)
+                {
+                    t_ilm_uint dimreturned[2] = {0, 0};
+                    EXPECT_EQ(ILM_SUCCESS,
+                              ilm_layerGetDimension(layerIDs[j], dimreturned));
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth,
+                              dimreturned[0]);
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight,
+                              dimreturned[1]);
+
+                    // Change something that has been pre-set and check callback
+                    ASSERT_EQ(ILM_SUCCESS,
+                              ilm_layerSetVisibility(layers_allocated[index].layerId,
+                              ILM_TRUE));
+
+                    // expect callback to have been called
+                    assertNoCallbackIsCalled();
+                }
+            }
+        }
+
+        layerIDs.clear();
+    }
+
+    layers_allocated.clear();
+}
