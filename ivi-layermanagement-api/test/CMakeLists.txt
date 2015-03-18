@@ -58,6 +58,7 @@ IF(BUILD_ILM_API_TESTS)
         ilm_control_test.cpp
         ilm_control_notification_test.cpp
         ilm_control_multi_test.cpp
+        ilm_min_max_invalid_test.cpp
     )
 
     ADD_EXECUTABLE(${PROJECT_NAME} ${SRC_FILES})
