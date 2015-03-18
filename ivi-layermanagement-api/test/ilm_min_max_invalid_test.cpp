@@ -2392,3 +2392,117 @@ TEST_F(IlmMinMaxInvalidTest, ilm_maxminGetSurfaceIDs)
 
     surfaces_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminSurfaceInitialize)
+{
+    // Create surface with id 0
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = 0;
+        surface->surfaceProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Try to initialise
+    {
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceInitialize(&(surfaces_allocated[0].returnedSurfaceId)));
+    }
+
+    // Create surface with id maximum value - expect failure
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceWidth = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Try to initialise - should fail since ID is invalid
+    {
+        EXPECT_EQ(ILM_FAILED,
+                  ilm_surfaceInitialize(&(surfaces_allocated[1].returnedSurfaceId)));
+    }
+
+    // Removal shouldn't work since max id shouldn't be valid
+    {
+        ASSERT_EQ(ILM_FAILED,
+                  ilm_surfaceRemove(surfaces_allocated[1].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Remove from vector
+        surfaces_allocated.pop_back();
+    }
+
+    // Create surface with id maximum value - 1 :- expect success
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = std::numeric_limits<t_ilm_uint>::max() - 1;
+        surface->surfaceProperties.origSourceWidth = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Try to initialise
+    {
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_surfaceInitialize(&(surfaces_allocated[1].returnedSurfaceId)));
+    }
+
+    // Check sizes and ID's
+    {
+        t_ilm_int length;
+        t_ilm_uint* IDs;
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        std::vector<t_ilm_surface> surfaceIDs;
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        EXPECT_EQ(surfaceIDs.size(), surfaces_allocated.size());
+        if (length == surfaces_allocated.size())
+        {
+            for (uint i = 0; i < surfaceIDs.size(); i++)
+            {
+                bool found = false;
+                for (uint j = 0; j < surfaces_allocated.size(); j++)
+                {
+                    if (surfaces_allocated[j].returnedSurfaceId
+                        == surfaceIDs[i])
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                EXPECT_EQ(found, true) << "Surface Id: "
+                                       << surfaceIDs[i]
+                                       << ", not found" << std::endl;
+            }
+        }
+        surfaceIDs.clear();
+    }
+
+    uint total_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (uint i = 0; i < total_surfaces; i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    surfaces_allocated.clear();
+}
