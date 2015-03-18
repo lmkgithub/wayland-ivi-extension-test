@@ -2305,3 +2305,90 @@ TEST_F(IlmMinMaxInvalidTest, ilm_maxminGetLayerIDs)
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminGetSurfaceIDs)
+{
+    // Create surface with id 0
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = 0;
+        surface->surfaceProperties.origSourceWidth = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[0],
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Create surface with id maximum value
+    // This is principle shouldn't be allowable since it equates to INVALID_ID?
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        EXPECT_EQ(ILM_FAILED,
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[1],
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Removal shouldn't work since max id shouldn't be valid
+    {
+        EXPECT_EQ(ILM_FAILED,
+                  ilm_surfaceRemove(surfaces_allocated[1].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Remove from vector
+        surfaces_allocated.pop_back();
+    }
+
+    // Create surface with id maximum value - 1, end of permissable
+    // range.
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = std::numeric_limits<t_ilm_uint>::max() - 1;
+        surface->surfaceProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[2],
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    uint num_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (uint i = 0; i < num_surfaces; i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    surfaces_allocated.clear();
+}
