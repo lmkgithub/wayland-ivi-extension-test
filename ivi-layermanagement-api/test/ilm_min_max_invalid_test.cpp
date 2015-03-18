@@ -2277,3 +2277,56 @@ TEST_F(IlmMinMaxInvalidTest, ilm_maxminGetLayerIDs)
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminGetSurfaceIDs)
+{
+    // Create surface with id 0
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = 0;
+        surface->surfaceProperties.origSourceWidth = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[0], 
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Create surface with id maximum value
+    {
+        surface_def * surface = new surface_def;
+        // Force surface value - not multi-client safe
+        surface->returnedSurfaceId = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceWidth = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[1], 
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    uint num_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (int i = 0; i < num_surfaces; i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    surfaces_allocated.clear();
+}
