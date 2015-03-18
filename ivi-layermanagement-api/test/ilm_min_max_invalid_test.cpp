@@ -1404,3 +1404,236 @@ TEST_F(IlmMinMaxInvalidTest, ilm_maxminSetGetSurfaceLayerOrientation)
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminSetGetSurfaceOpacity)
+{
+    uint no_surfaces = 4;
+    uint no_layers = 2;
+
+    // Create surfaces
+    for (uint i = 0; i < no_surfaces; i++)
+    {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId = getSurface();
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surface->surfaceProperties.origSourceWidth = 150 + ( i * 10 );
+        surface->surfaceProperties.origSourceHeight = 250 + ( i + 10 );
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i],
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of surfaces
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint surf_dim[2] = {surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                  surfaces_allocated[i].surfaceProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId,
+                                          surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set position of surfaces to maximum
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint surf_pos[2] = {std::numeric_limits<t_ilm_uint>::max(),
+                                  std::numeric_limits<t_ilm_uint>::max()};
+        surfaces_allocated[i].surfaceProperties.sourceX = surf_pos[0];
+        surfaces_allocated[i].surfaceProperties.sourceY = surf_pos[1];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetPosition(surfaces_allocated[i].returnedSurfaceId,
+                                         surf_pos));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set Opacity of surfaces to maximum float value
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surfaces_allocated[i].surfaceProperties.opacity
+            = std::numeric_limits<t_ilm_float>::max();
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                                        surfaces_allocated[i].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check Opacity of surfaces
+    // Unclear if this should round down to 1.0 or return error state
+    // when max float is passed.
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_float returned;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceGetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                                        &returned));
+        EXPECT_NEAR(surfaces_allocated[i].surfaceProperties.opacity,
+                    returned,
+                    0.01);
+    }
+
+    // Create layers
+    for (uint i = 0; i < no_layers; i++)
+    {
+        layer_def * layer = new layer_def;
+        layer->layerId = getLayer();
+        layer->layerProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        layer->layerProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set position of layers to maximum
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint layer_pos[2] = {std::numeric_limits<t_ilm_uint>::max(),
+                                  std::numeric_limits<t_ilm_uint>::max()};
+        layers_allocated[i].layerProperties.sourceX = layer_pos[0];
+        layers_allocated[i].layerProperties.sourceY = layer_pos[1];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetPosition(layers_allocated[i].layerId,
+                                       layer_pos));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Add surfaces to layers
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        for (uint j = (i * (surfaces_allocated.size() / layers_allocated.size()));
+             j < ((i + 1) * (surfaces_allocated.size() / layers_allocated.size()));
+             j++)
+        {
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerAddSurface(layers_allocated[i].layerId,
+                                          surfaces_allocated[j].returnedSurfaceId));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        }
+    }
+
+    // Change things again
+
+    // Set Opacity of surfaces to 0.0 float value
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surfaces_allocated[i].surfaceProperties.opacity = 0.0;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check Opacity of surfaces
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_float returned;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceGetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                                        &returned));
+        EXPECT_NEAR(surfaces_allocated[i].surfaceProperties.opacity,
+                    returned,
+                    0.01);
+    }
+
+    // Change things again
+
+    // Set Opacity of surfaces to minimum float value
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        surfaces_allocated[i].surfaceProperties.opacity
+            = std::numeric_limits<t_ilm_float>::min();
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                  surfaces_allocated[i].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check Opacity of surfaces
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_float returned;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceGetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                                        &returned));
+        EXPECT_NEAR(surfaces_allocated[i].surfaceProperties.opacity,
+                    returned,
+                    0.01);
+    }
+
+    uint num_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (uint i = 0; i < num_surfaces; i++)
+    {
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (uint j = 0; j < length; j++)
+        {
+            uint index = num_surfaces;
+
+            for (uint k = 0; k < surfaces_allocated.size(); k++)
+            {
+                if (surfaceIDs[j] == surfaces_allocated[k].returnedSurfaceId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != num_surfaces)
+            {
+                t_ilm_float returned;
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_surfaceGetOpacity(surfaces_allocated[index].returnedSurfaceId,
+                                                &returned));
+                EXPECT_NEAR(surfaces_allocated[index].surfaceProperties.opacity,
+                            returned,
+                            0.01);
+            }
+        }
+
+        surfaceIDs.clear();
+    }
+
+    surfaces_allocated.clear();
+
+    uint total_layers = layers_allocated.size();
+
+    // remove the layers
+    for (uint i = 0; i < total_layers; i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    layers_allocated.clear();
+}
