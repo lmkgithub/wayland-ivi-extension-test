@@ -2409,3 +2409,225 @@ TEST_F(IlmMinMaxInvalidTest, ilm_maxminSurfaceInitialize)
 
     surfaces_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminLayersSurfaces)
+{
+   uint no_surfaces = 4;
+   uint no_layers = 2;
+
+   // Create surfaces
+   for (int i = 0; i < no_surfaces; i++)
+   {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId = getSurface();
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surface->surfaceProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i], 
+                                     surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                     surfaces_allocated[i].surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of surfaces
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint surf_dim[2] = {surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                  surfaces_allocated[i].surfaceProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId,
+                                          surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check parameters
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint dim_rtn[2] = {0, 0};
+
+        // Confirm dimension
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_surfaceGetDimension(surfaces_allocated[i].returnedSurfaceId,
+                  dim_rtn));
+
+        EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                  dim_rtn[0]);
+        EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceHeight,
+                  dim_rtn[1]);
+    }
+
+    // Create layers
+    for (int i = 0; i < no_layers; i++)
+    {
+        layer_def * layer = new layer_def;
+        layer->layerId = getLayer();
+        layer->layerProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::min();
+        layer->layerProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::min();
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check parameters
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint dim_rtn[2] = {0, 0};
+
+        // Confirm dimension
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerGetDimension(layers_allocated[i].layerId,
+                  dim_rtn));
+
+        EXPECT_EQ(layers_allocated[i].layerProperties.origSourceWidth,
+                  dim_rtn[0]);
+        EXPECT_EQ(layers_allocated[i].layerProperties.origSourceHeight,
+                  dim_rtn[1]);
+    }
+
+    // Add surfaces to layers
+    for (int i = 0; i < no_layers; i++)
+    {
+        for (int j = (i * (surfaces_allocated.size() / layers_allocated.size()));
+             j < ((i + 1) * (surfaces_allocated.size() / layers_allocated.size()));
+             j++)
+        {
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerAddSurface(layers_allocated[i].layerId,
+                                          surfaces_allocated[j].returnedSurfaceId));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        }
+    }
+
+    uint num_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (int i = 0; i < num_surfaces; i++)
+    {
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+            uint index = num_surfaces;
+
+            for (int k = 0; k < surfaces_allocated.size(); k++)
+            {
+                if (surfaceIDs[j] == surfaces_allocated[k].returnedSurfaceId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != num_surfaces)
+            {
+                // Confirm dimensions
+                t_ilm_uint dim_returned[2] = {0, 0};
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_surfaceGetDimension(surfaceIDs[j], dim_returned));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceWidth,
+                          dim_returned[0]);
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceHeight,
+                          dim_returned[1]);
+            }
+        }
+
+        surfaceIDs.clear();
+    }
+
+    surfaces_allocated.clear();
+
+    uint total_layers = layers_allocated.size();
+
+    // remove the layers
+    for (int i = 0; i < total_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (int j = 0; j < length; j++)
+        {
+
+            uint index = total_layers;
+
+            for (int k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != total_layers)
+            {
+                // Iterate round remaining layers and check dimensions 
+                for (int k = 0; k < length; k++)
+                {
+                    t_ilm_uint dim_rtn[2] = {0, 0};
+
+                    // Confirm dimension
+                    EXPECT_EQ(ILM_SUCCESS,
+                              ilm_layerGetDimension(layers_allocated[index].layerId,
+                              dim_rtn));
+
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth,
+                              dim_rtn[0]);
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight,
+                              dim_rtn[1]);
+
+                    // Change something that has been pre-set and check callback
+                    ASSERT_EQ(ILM_SUCCESS,
+                              ilm_layerSetVisibility(layers_allocated[index].layerId,
+                              ILM_TRUE));
+
+                    // expect callback to have been called
+                    assertNoCallbackIsCalled();
+                }
+            }
+        }
+
+        layerIDs.clear();
+    }
+
+    layers_allocated.clear();
+}
