@@ -3312,3 +3312,573 @@ TEST_F(IlmMinMaxInvalidTest, ilm_maxminSurfaceSourceDestination)
 
     surfaces_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminLayerSourceDestination)
+{
+    e_ilmOrientation orientation[4] = {ILM_ZERO, ILM_NINETY,
+                                       ILM_ONEHUNDREDEIGHTY,
+                                       ILM_TWOHUNDREDSEVENTY};
+
+   // Create layer - not multi client safe
+   {
+        layer_def * layer = new layer_def;
+        layer->layerId = std::numeric_limits<t_ilm_layer>::max() - 1;
+        layer->layerProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        layer->layerProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layers_allocated[0].layerProperties.origSourceWidth,
+                                               layers_allocated[0].layerProperties.origSourceHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set other values
+
+    // Set opacity
+    {
+        layers_allocated[0].layerProperties.opacity
+            = std::numeric_limits<t_ilm_float>::max();
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOpacity(layers_allocated[0].layerId,
+                                      layers_allocated[0].layerProperties.opacity));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        layers_allocated[0].layerProperties.sourceX
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.sourceY
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.sourceWidth
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.sourceHeight
+            = std::numeric_limits<t_ilm_int>::max();
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetSourceRectangle(layers_allocated[0].layerId,
+                                                layers_allocated[0].layerProperties.sourceX,
+                                                layers_allocated[0].layerProperties.sourceY,
+                                                layers_allocated[0].layerProperties.sourceWidth,
+                                                layers_allocated[0].layerProperties.sourceHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of layers
+        layers_allocated[0].layerProperties.destX
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.destY
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.destWidth
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.destHeight
+            = std::numeric_limits<t_ilm_int>::max();
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDestinationRectangle(layers_allocated[0].layerId,
+                                                     layers_allocated[0].layerProperties.destX,
+                                                     layers_allocated[0].layerProperties.destY,
+                                                     layers_allocated[0].layerProperties.destWidth,
+                                                     layers_allocated[0].layerProperties.destHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        layers_allocated[0].layerProperties.orientation = ILM_NINETY;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOrientation(layers_allocated[0].layerId,
+                                          layers_allocated[0].layerProperties.orientation));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change visibility
+        layers_allocated[0].layerProperties.visibility = ILM_TRUE;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetVisibility(layers_allocated[0].layerId,
+                                         layers_allocated[0].layerProperties.visibility));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check property values
+    {
+        ilmLayerProperties returnValue;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[0].layerId,
+                                           &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(layers_allocated[0].layerProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.sourceX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.sourceY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.sourceWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.sourceHeight);
+
+        // Check destination values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.destX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.destY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.destWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.destHeight);
+
+        // Check orientation value
+        EXPECT_EQ(returnValue.orientation,
+                  layers_allocated[0].layerProperties.orientation);
+
+        // Check visibility value
+        EXPECT_EQ(returnValue.visibility,
+                  layers_allocated[0].layerProperties.visibility);
+
+    }
+
+    // Change values
+
+    // Set opacity
+    {
+        layers_allocated[0].layerProperties.opacity
+            = std::numeric_limits<t_ilm_float>::min();
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOpacity(layers_allocated[0].layerId,
+                                        layers_allocated[0].layerProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        layers_allocated[0].layerProperties.sourceX = 0;
+        layers_allocated[0].layerProperties.sourceY = 0;
+        layers_allocated[0].layerProperties.sourceWidth = 0;
+        layers_allocated[0].layerProperties.sourceHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetSourceRectangle(layers_allocated[0].layerId,
+                                                layers_allocated[0].layerProperties.sourceX,
+                                                layers_allocated[0].layerProperties.sourceY,
+                                                layers_allocated[0].layerProperties.sourceWidth,
+                                                layers_allocated[0].layerProperties.sourceHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of layers
+        layers_allocated[0].layerProperties.destX = 0;
+        layers_allocated[0].layerProperties.destY = 0;
+        layers_allocated[0].layerProperties.destWidth = 0;
+        layers_allocated[0].layerProperties.destHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDestinationRectangle(layers_allocated[0].layerId,
+                                                     layers_allocated[0].layerProperties.destX,
+                                                     layers_allocated[0].layerProperties.destY,
+                                                     layers_allocated[0].layerProperties.destWidth,
+                                                     layers_allocated[0].layerProperties.destHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        layers_allocated[0].layerProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOrientation(layers_allocated[0].layerId,
+                                            layers_allocated[0].layerProperties.orientation));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetVisibility(layers_allocated[0].layerId,
+                  layers_allocated[0].layerProperties.visibility = ILM_FALSE));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check property values
+    {
+        ilmLayerProperties returnValue;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[0].layerId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(layers_allocated[0].layerProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.sourceX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.sourceY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.sourceWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.sourceHeight);
+
+        // Check destination values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.destX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.destY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.destWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.destHeight);
+
+        // Check orientation value
+        EXPECT_EQ(returnValue.orientation,
+                  layers_allocated[0].layerProperties.orientation);
+
+        // Check visibility value
+        EXPECT_EQ(returnValue.visibility,
+                  layers_allocated[0].layerProperties.visibility);
+
+    }
+
+    // Change more values
+
+    // Set opacity
+    {
+        layers_allocated[0].layerProperties.opacity = 0.0;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOpacity(layers_allocated[0].layerId,
+                                        layers_allocated[0].layerProperties.opacity));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        layers_allocated[0].layerProperties.sourceX
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.sourceY
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.sourceWidth = 0;
+        layers_allocated[0].layerProperties.sourceHeight = 0;
+
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetSourceRectangle(layers_allocated[0].layerId,
+                                                layers_allocated[0].layerProperties.sourceX,
+                                                layers_allocated[0].layerProperties.sourceY,
+                                                layers_allocated[0].layerProperties.sourceWidth,
+                                                layers_allocated[0].layerProperties.sourceHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of layers
+        layers_allocated[0].layerProperties.destX
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.destY
+            = std::numeric_limits<t_ilm_int>::max();
+        layers_allocated[0].layerProperties.destWidth = 0;
+        layers_allocated[0].layerProperties.destHeight = 0;
+
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDestinationRectangle(layers_allocated[0].layerId,
+                                                     layers_allocated[0].layerProperties.destX,
+                                                     layers_allocated[0].layerProperties.destY,
+                                                     layers_allocated[0].layerProperties.destWidth,
+                                                     layers_allocated[0].layerProperties.destHeight));
+            EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        layers_allocated[0].layerProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOrientation(layers_allocated[0].layerId,
+                                            layers_allocated[0].layerProperties.orientation));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetVisibility(layers_allocated[0].layerId,
+                  layers_allocated[0].layerProperties.visibility = ILM_FALSE));
+    }
+
+    // Check property values
+    {
+        ilmLayerProperties returnValue;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[0].layerId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(layers_allocated[0].layerProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.sourceX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.sourceY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.sourceWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.sourceHeight);
+
+        // Check destination values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.destX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.destY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.destWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.destHeight);
+
+        // Check orientation value
+        EXPECT_EQ(returnValue.orientation,
+                  layers_allocated[0].layerProperties.orientation);
+
+        // Check visibility value
+        EXPECT_EQ(returnValue.visibility,
+                  layers_allocated[0].layerProperties.visibility);
+
+    }
+
+    // Change even more values
+
+    // Set opacity
+    {
+        layers_allocated[0].layerProperties.opacity = 0.0;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOpacity(layers_allocated[0].layerId,
+                                        layers_allocated[0].layerProperties.opacity));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        layers_allocated[0].layerProperties.sourceX = 0;
+        layers_allocated[0].layerProperties.sourceY = 0;
+        layers_allocated[0].layerProperties.sourceWidth = 0;
+        layers_allocated[0].layerProperties.sourceHeight = 0;
+
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetSourceRectangle(layers_allocated[0].layerId,
+                                                layers_allocated[0].layerProperties.sourceX,
+                                                layers_allocated[0].layerProperties.sourceY,
+                                                layers_allocated[0].layerProperties.sourceWidth,
+                                                layers_allocated[0].layerProperties.sourceHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of layers
+        layers_allocated[0].layerProperties.destX = 0;
+        layers_allocated[0].layerProperties.destY = 0;
+        layers_allocated[0].layerProperties.destWidth = 0;
+        layers_allocated[0].layerProperties.destHeight = 0;
+
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDestinationRectangle(layers_allocated[0].layerId,
+                                                     layers_allocated[0].layerProperties.destX,
+                                                     layers_allocated[0].layerProperties.destY,
+                                                     layers_allocated[0].layerProperties.destWidth,
+                                                     layers_allocated[0].layerProperties.destHeight));
+            EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        layers_allocated[0].layerProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOrientation(layers_allocated[0].layerId,
+                                            layers_allocated[0].layerProperties.orientation));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetVisibility(layers_allocated[0].layerId,
+                  layers_allocated[0].layerProperties.visibility = ILM_FALSE));
+    }
+
+    // Check property values
+    {
+        ilmLayerProperties returnValue;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[0].layerId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(layers_allocated[0].layerProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.sourceX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.sourceY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.sourceWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.sourceHeight);
+
+        // Check destination values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.destX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.destY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.destWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.destHeight);
+
+        // Check orientation value
+        EXPECT_EQ(returnValue.orientation,
+                  layers_allocated[0].layerProperties.orientation);
+
+        // Check visibility value
+        EXPECT_EQ(returnValue.visibility,
+                  layers_allocated[0].layerProperties.visibility);
+
+    }
+
+    // Change more values
+
+    // Set opacity
+    {
+        layers_allocated[0].layerProperties.opacity = 0.0;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOpacity(layers_allocated[0].layerId,
+                                        layers_allocated[0].layerProperties.opacity));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        layers_allocated[0].layerProperties.sourceX
+            = std::numeric_limits<t_ilm_int>::min();
+        layers_allocated[0].layerProperties.sourceY
+            = std::numeric_limits<t_ilm_int>::min();
+        layers_allocated[0].layerProperties.sourceWidth
+            = std::numeric_limits<t_ilm_int>::min();
+        layers_allocated[0].layerProperties.sourceHeight
+            = std::numeric_limits<t_ilm_int>::min();
+
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetSourceRectangle(layers_allocated[0].layerId,
+                                                layers_allocated[0].layerProperties.sourceX,
+                                                layers_allocated[0].layerProperties.sourceY,
+                                                layers_allocated[0].layerProperties.sourceWidth,
+                                                layers_allocated[0].layerProperties.sourceHeight));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of layers
+        layers_allocated[0].layerProperties.destX
+            = std::numeric_limits<t_ilm_int>::min();
+        layers_allocated[0].layerProperties.destY
+            = std::numeric_limits<t_ilm_int>::min();
+        layers_allocated[0].layerProperties.destWidth
+            = std::numeric_limits<t_ilm_int>::min();
+        layers_allocated[0].layerProperties.destHeight
+            = std::numeric_limits<t_ilm_int>::min();
+
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDestinationRectangle(layers_allocated[0].layerId,
+                                                     layers_allocated[0].layerProperties.destX,
+                                                     layers_allocated[0].layerProperties.destY,
+                                                     layers_allocated[0].layerProperties.destWidth,
+                                                     layers_allocated[0].layerProperties.destHeight));
+            EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        layers_allocated[0].layerProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetOrientation(layers_allocated[0].layerId,
+                                            layers_allocated[0].layerProperties.orientation));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_layerSetVisibility(layers_allocated[0].layerId,
+                  layers_allocated[0].layerProperties.visibility = ILM_TRUE));
+        EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check property values
+    {
+        ilmLayerProperties returnValue;
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[0].layerId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(layers_allocated[0].layerProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.sourceX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.sourceY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.sourceWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.sourceHeight);
+
+        // Check destination values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[0].layerProperties.destX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[0].layerProperties.destY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[0].layerProperties.destWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[0].layerProperties.destHeight);
+
+        // Check orientation value
+        EXPECT_EQ(returnValue.orientation,
+                  layers_allocated[0].layerProperties.orientation);
+
+        // Check visibility value
+        EXPECT_EQ(returnValue.visibility,
+                  layers_allocated[0].layerProperties.visibility);
+
+    }
+
+    // Remove layer
+    EXPECT_EQ(ILM_SUCCESS,
+              ilm_layerRemoveNotification(layers_allocated[0].layerId));
+    EXPECT_EQ(ILM_SUCCESS,
+              ilm_layerRemove(layers_allocated[0].layerId));
+    EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+    layers_allocated.clear();
+}
