@@ -2730,3 +2730,587 @@ TEST_F(IlmMinMaxInvalidTest, ilm_maxminLayersSurfaces)
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmMinMaxInvalidTest, ilm_maxminSurfaceSourceDestination)
+{
+    e_ilmOrientation orientation[4] = {ILM_ZERO, ILM_NINETY,
+                                       ILM_ONEHUNDREDEIGHTY,
+                                       ILM_TWOHUNDREDSEVENTY};
+
+   // Create surface - not multi client safe
+   {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId
+            = std::numeric_limits<t_ilm_surface>::max() - 1;
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surface->surfaceProperties.origSourceWidth
+            = std::numeric_limits<t_ilm_uint>::max();
+        surface->surfaceProperties.origSourceHeight
+            = std::numeric_limits<t_ilm_uint>::max();
+        surfaces_allocated.push_back(*surface);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[0],
+                                     surfaces_allocated[0].surfaceProperties.origSourceWidth,
+                                     surfaces_allocated[0].surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &(surface->returnedSurfaceId)));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Explictly set dimensions
+    {
+        t_ilm_uint surf_dim[2] = {surfaces_allocated[0].surfaceProperties.origSourceWidth,
+                                  surfaces_allocated[0].surfaceProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDimension(surfaces_allocated[0].returnedSurfaceId,
+                                          surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set other values
+
+    // Set opacity
+    {
+        surfaces_allocated[0].surfaceProperties.opacity
+            = std::numeric_limits<t_ilm_float>::max();
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[0].returnedSurfaceId,
+                                        surfaces_allocated[0].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        surfaces_allocated[0].surfaceProperties.sourceX
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.sourceY
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.sourceWidth
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.sourceHeight
+            = std::numeric_limits<t_ilm_int>::max();
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                surfaces_allocated[0].surfaceProperties.sourceX,
+                                                surfaces_allocated[0].surfaceProperties.sourceY,
+                                                surfaces_allocated[0].surfaceProperties.sourceWidth,
+                                                surfaces_allocated[0].surfaceProperties.sourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of surfaces
+        surfaces_allocated[0].surfaceProperties.destX
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.destY
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.destWidth
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.destHeight
+            = std::numeric_limits<t_ilm_int>::max();
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDestinationRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                     surfaces_allocated[0].surfaceProperties.destX,
+                                                     surfaces_allocated[0].surfaceProperties.destY,
+                                                     surfaces_allocated[0].surfaceProperties.destWidth,
+                                                     surfaces_allocated[0].surfaceProperties.destHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        surfaces_allocated[0].surfaceProperties.orientation = ILM_NINETY;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOrientation(surfaces_allocated[0].returnedSurfaceId,
+                                            surfaces_allocated[0].surfaceProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        surfaces_allocated[0].surfaceProperties.visibility = ILM_TRUE;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[0].returnedSurfaceId,
+                  surfaces_allocated[0].surfaceProperties.visibility));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check property values
+    {
+        ilmSurfaceProperties returnValue;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfSurface(surfaces_allocated[0].returnedSurfaceId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(surfaces_allocated[0].surfaceProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.sourceX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.sourceY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.sourceWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.sourceHeight);
+
+        // Check destination values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.destX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.destY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.destWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.destHeight);
+
+        // Check orientation value
+        ASSERT_EQ(returnValue.orientation,
+                  surfaces_allocated[0].surfaceProperties.orientation);
+
+        // Check visibility value
+        ASSERT_EQ(returnValue.visibility,
+                  surfaces_allocated[0].surfaceProperties.visibility);
+
+    }
+
+    // Change values
+
+    // Set opacity
+    {
+        surfaces_allocated[0].surfaceProperties.opacity
+            = std::numeric_limits<t_ilm_float>::min();
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[0].returnedSurfaceId,
+                                        surfaces_allocated[0].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        surfaces_allocated[0].surfaceProperties.sourceX = 0;
+        surfaces_allocated[0].surfaceProperties.sourceY = 0;
+        surfaces_allocated[0].surfaceProperties.sourceWidth = 0;
+        surfaces_allocated[0].surfaceProperties.sourceHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                surfaces_allocated[0].surfaceProperties.sourceX,
+                                                surfaces_allocated[0].surfaceProperties.sourceY,
+                                                surfaces_allocated[0].surfaceProperties.sourceWidth,
+                                                surfaces_allocated[0].surfaceProperties.sourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of surfaces
+        surfaces_allocated[0].surfaceProperties.destX = 0;
+        surfaces_allocated[0].surfaceProperties.destY = 0;
+        surfaces_allocated[0].surfaceProperties.destWidth = 0;
+        surfaces_allocated[0].surfaceProperties.destHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDestinationRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                     surfaces_allocated[0].surfaceProperties.destX,
+                                                     surfaces_allocated[0].surfaceProperties.destY,
+                                                     surfaces_allocated[0].surfaceProperties.destWidth,
+                                                     surfaces_allocated[0].surfaceProperties.destHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        surfaces_allocated[0].surfaceProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOrientation(surfaces_allocated[0].returnedSurfaceId,
+                                            surfaces_allocated[0].surfaceProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[0].returnedSurfaceId,
+                  surfaces_allocated[0].surfaceProperties.visibility = ILM_FALSE));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check property values
+    {
+        ilmSurfaceProperties returnValue;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfSurface(surfaces_allocated[0].returnedSurfaceId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(surfaces_allocated[0].surfaceProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.sourceX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.sourceY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.sourceWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.sourceHeight);
+
+        // Check destination values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.destX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.destY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.destWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.destHeight);
+
+        // Check orientation value
+        ASSERT_EQ(returnValue.orientation,
+                  surfaces_allocated[0].surfaceProperties.orientation);
+
+        // Check visibility value
+        ASSERT_EQ(returnValue.visibility,
+                  surfaces_allocated[0].surfaceProperties.visibility);
+
+    }
+
+    // Change more values
+
+    // Set opacity
+    {
+        surfaces_allocated[0].surfaceProperties.opacity = 0.0;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[0].returnedSurfaceId,
+                                        surfaces_allocated[0].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        surfaces_allocated[0].surfaceProperties.sourceX
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.sourceY
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.sourceWidth = 0;
+        surfaces_allocated[0].surfaceProperties.sourceHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                surfaces_allocated[0].surfaceProperties.sourceX,
+                                                surfaces_allocated[0].surfaceProperties.sourceY,
+                                                surfaces_allocated[0].surfaceProperties.sourceWidth,
+                                                surfaces_allocated[0].surfaceProperties.sourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of surfaces
+        surfaces_allocated[0].surfaceProperties.destX
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.destY
+            = std::numeric_limits<t_ilm_int>::max();
+        surfaces_allocated[0].surfaceProperties.destWidth = 0;
+        surfaces_allocated[0].surfaceProperties.destHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDestinationRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                     surfaces_allocated[0].surfaceProperties.destX,
+                                                     surfaces_allocated[0].surfaceProperties.destY,
+                                                     surfaces_allocated[0].surfaceProperties.destWidth,
+                                                     surfaces_allocated[0].surfaceProperties.destHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        surfaces_allocated[0].surfaceProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOrientation(surfaces_allocated[0].returnedSurfaceId,
+                                            surfaces_allocated[0].surfaceProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[0].returnedSurfaceId,
+                  surfaces_allocated[0].surfaceProperties.visibility = ILM_FALSE));
+    }
+
+    // Check property values
+    {
+        ilmSurfaceProperties returnValue;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfSurface(surfaces_allocated[0].returnedSurfaceId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(surfaces_allocated[0].surfaceProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.sourceX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.sourceY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.sourceWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.sourceHeight);
+
+        // Check destination values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.destX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.destY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.destWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.destHeight);
+
+        // Check orientation value
+        ASSERT_EQ(returnValue.orientation,
+                  surfaces_allocated[0].surfaceProperties.orientation);
+
+        // Check visibility value
+        ASSERT_EQ(returnValue.visibility,
+                  surfaces_allocated[0].surfaceProperties.visibility);
+
+    }
+
+    // Change even more values
+
+    // Set opacity
+    {
+        surfaces_allocated[0].surfaceProperties.opacity = 0.0;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[0].returnedSurfaceId,
+                                        surfaces_allocated[0].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        surfaces_allocated[0].surfaceProperties.sourceX = 0;
+        surfaces_allocated[0].surfaceProperties.sourceY = 0;
+        surfaces_allocated[0].surfaceProperties.sourceWidth = 0;
+        surfaces_allocated[0].surfaceProperties.sourceHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                surfaces_allocated[0].surfaceProperties.sourceX,
+                                                surfaces_allocated[0].surfaceProperties.sourceY,
+                                                surfaces_allocated[0].surfaceProperties.sourceWidth,
+                                                surfaces_allocated[0].surfaceProperties.sourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of surfaces
+        surfaces_allocated[0].surfaceProperties.destX = 0;
+        surfaces_allocated[0].surfaceProperties.destY = 0;
+        surfaces_allocated[0].surfaceProperties.destWidth = 0;
+        surfaces_allocated[0].surfaceProperties.destHeight = 0;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDestinationRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                     surfaces_allocated[0].surfaceProperties.destX,
+                                                     surfaces_allocated[0].surfaceProperties.destY,
+                                                     surfaces_allocated[0].surfaceProperties.destWidth,
+                                                     surfaces_allocated[0].surfaceProperties.destHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        surfaces_allocated[0].surfaceProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOrientation(surfaces_allocated[0].returnedSurfaceId,
+                                            surfaces_allocated[0].surfaceProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[0].returnedSurfaceId,
+                  surfaces_allocated[0].surfaceProperties.visibility = ILM_FALSE));
+    }
+
+    // Check property values
+    {
+        ilmSurfaceProperties returnValue;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfSurface(surfaces_allocated[0].returnedSurfaceId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(surfaces_allocated[0].surfaceProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.sourceX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.sourceY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.sourceWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.sourceHeight);
+
+        // Check destination values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.destX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.destY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.destWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.destHeight);
+
+        // Check orientation value
+        ASSERT_EQ(returnValue.orientation,
+                  surfaces_allocated[0].surfaceProperties.orientation);
+
+        // Check visibility value
+        ASSERT_EQ(returnValue.visibility,
+                  surfaces_allocated[0].surfaceProperties.visibility);
+
+    }
+
+    // Change more values
+
+    // Set opacity
+    {
+        surfaces_allocated[0].surfaceProperties.opacity = 0.0;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOpacity(surfaces_allocated[0].returnedSurfaceId,
+                                        surfaces_allocated[0].surfaceProperties.opacity));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set source rectangle
+    {
+        surfaces_allocated[0].surfaceProperties.sourceX
+            = std::numeric_limits<t_ilm_int>::min();
+        surfaces_allocated[0].surfaceProperties.sourceY
+            = std::numeric_limits<t_ilm_int>::min();
+        surfaces_allocated[0].surfaceProperties.sourceWidth
+            = std::numeric_limits<t_ilm_int>::min();
+        surfaces_allocated[0].surfaceProperties.sourceHeight
+            = std::numeric_limits<t_ilm_int>::min();
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetSourceRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                surfaces_allocated[0].surfaceProperties.sourceX,
+                                                surfaces_allocated[0].surfaceProperties.sourceY,
+                                                surfaces_allocated[0].surfaceProperties.sourceWidth,
+                                                surfaces_allocated[0].surfaceProperties.sourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set destination rectangle
+    {
+        // Set destination rectangle of surfaces
+        surfaces_allocated[0].surfaceProperties.destX
+            = std::numeric_limits<t_ilm_int>::min();
+        surfaces_allocated[0].surfaceProperties.destY
+            = std::numeric_limits<t_ilm_int>::min();
+        surfaces_allocated[0].surfaceProperties.destWidth
+            = std::numeric_limits<t_ilm_int>::min();
+        surfaces_allocated[0].surfaceProperties.destHeight
+            = std::numeric_limits<t_ilm_int>::min();
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDestinationRectangle(surfaces_allocated[0].returnedSurfaceId,
+                                                     surfaces_allocated[0].surfaceProperties.destX,
+                                                     surfaces_allocated[0].surfaceProperties.destY,
+                                                     surfaces_allocated[0].surfaceProperties.destWidth,
+                                                     surfaces_allocated[0].surfaceProperties.destHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set orientation
+    {
+        surfaces_allocated[0].surfaceProperties.orientation = ILM_TWOHUNDREDSEVENTY;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetOrientation(surfaces_allocated[0].returnedSurfaceId,
+                                            surfaces_allocated[0].surfaceProperties.orientation));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set visibility
+    {
+        // Change something that has been pre-set and check callback
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[0].returnedSurfaceId,
+                  surfaces_allocated[0].surfaceProperties.visibility = ILM_TRUE));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Check property values
+    {
+        ilmSurfaceProperties returnValue;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfSurface(surfaces_allocated[0].returnedSurfaceId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(surfaces_allocated[0].surfaceProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.sourceX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.sourceY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.sourceWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.sourceHeight);
+
+        // Check destination values
+        ASSERT_EQ(returnValue.sourceX,
+                  surfaces_allocated[0].surfaceProperties.destX);
+        ASSERT_EQ(returnValue.sourceY,
+                  surfaces_allocated[0].surfaceProperties.destY);
+        ASSERT_EQ(returnValue.sourceWidth,
+                  surfaces_allocated[0].surfaceProperties.destWidth);
+        ASSERT_EQ(returnValue.sourceHeight,
+                  surfaces_allocated[0].surfaceProperties.destHeight);
+
+        // Check orientation value
+        ASSERT_EQ(returnValue.orientation,
+                  surfaces_allocated[0].surfaceProperties.orientation);
+
+        // Check visibility value
+        ASSERT_EQ(returnValue.visibility,
+                  surfaces_allocated[0].surfaceProperties.visibility);
+
+    }
+
+    // Remove surface
+    ASSERT_EQ(ILM_SUCCESS,
+              ilm_surfaceRemoveNotification(surfaces_allocated[0].returnedSurfaceId));
+    ASSERT_EQ(ILM_SUCCESS,
+              ilm_surfaceRemove(surfaces_allocated[0].returnedSurfaceId));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+    surfaces_allocated.clear();
+}
