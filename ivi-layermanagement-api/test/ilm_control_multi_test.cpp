@@ -2905,3 +2905,250 @@ TEST_F(IlmCommandMultiTest, multi_SetLayerSourceRectangle) {
 
     layers_allocated.clear();
 }
+
+TEST_F(IlmCommandMultiTest, ilm_multiTakeSurfaceLayerScreenshots) {
+
+    uint no_surfaces = 4;
+    uint no_layers = 4;
+
+    const char* outputFile = "/tmp/test.bmp";
+
+    // Create surfaces.
+    for (uint i = 0; i < no_surfaces; i++)
+    {
+        surface_def * surface = new surface_def;
+        surface->requestedSurfaceId = getSurface();
+        surface->returnedSurfaceId = surface->requestedSurfaceId;
+        surface->surfaceProperties.origSourceWidth = 17 * (i + 1);
+        surface->surfaceProperties.origSourceHeight = 23 * (i + 1);
+
+        ASSERT_EQ(ILM_SUCCESS, 
+                  ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i], 
+                                     surface->surfaceProperties.origSourceWidth,
+                                     surface->surfaceProperties.origSourceHeight,
+                                     ILM_PIXELFORMAT_RGBA_8888,
+                                     &surface->returnedSurfaceId));
+        surfaces_allocated.push_back(*surface);
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Set dimensions of surfaces using valid pointer
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint surf_dim[2] = {surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                  surfaces_allocated[i].surfaceProperties.origSourceHeight};
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId,
+                                          surf_dim));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Try to set position of surfaces
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        t_ilm_uint surf_pos[2] = {18 + (i * 7), 21 + (i * 4)};
+        surfaces_allocated[i].surfaceProperties.sourceX = surf_pos[0];
+        surfaces_allocated[i].surfaceProperties.sourceY = surf_pos[1];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetPosition(surfaces_allocated[i].returnedSurfaceId,
+                                         surf_pos));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Try to create layers
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        layer_def * layer = new layer_def;
+        layer->layerId = getLayer();
+        layer->layerProperties.origSourceWidth = 200 * (i + 1);
+        layer->layerProperties.origSourceHeight = 240 * (i + 1);
+        layers_allocated.push_back(*layer);
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerCreateWithDimension(&(layer->layerId),
+                                               layer->layerProperties.origSourceWidth,
+                                               layer->layerProperties.origSourceHeight));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Try to set position of layers using valid pointer
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        t_ilm_uint layer_pos[2] = {12 + (i * 2), 23 + (i * 6)};
+        layers_allocated[i].layerProperties.sourceX = layer_pos[0];
+        layers_allocated[i].layerProperties.sourceY = layer_pos[1];
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetPosition(layers_allocated[i].layerId,
+                                       layer_pos));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    }
+
+    // Loop round and take layer shots
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        // make sure the file is not there before
+        FILE* f = fopen(outputFile, "r");
+        if (f!=NULL){
+            fclose(f);
+            int result = remove(outputFile);
+            ASSERT_EQ(0, result);
+        }
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_takeLayerScreenshot(outputFile,
+                                          layers_allocated[i].layerId));
+
+        sleep(1);
+        f = fopen(outputFile, "r");
+        ASSERT_TRUE(f!=NULL);
+        fclose(f);
+        remove(outputFile);
+    }
+
+    // Loop round and take surface shots
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        // make sure the file is not there before
+        FILE* f = fopen(outputFile, "r");
+        if (f!=NULL){
+            fclose(f);
+            int result = remove(outputFile);
+            ASSERT_EQ(0, result);
+        }
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_takeSurfaceScreenshot(outputFile,
+                                            surfaces_allocated[i].returnedSurfaceId));
+
+        sleep(1);
+        f = fopen(outputFile, "r");
+        ASSERT_TRUE(f!=NULL);
+        fclose(f);
+        remove(outputFile);
+    }
+
+    t_ilm_uint num_surfaces = surfaces_allocated.size();
+
+    // Loop through surfaces and remove
+    for (uint i = 0; i < num_surfaces; i++)
+    {
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemoveNotification(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_surfaceRemove(surfaces_allocated[i].returnedSurfaceId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (uint j = 0; j < length; j++)
+        {
+            uint index = num_surfaces;
+
+            for (uint k = 0; k < surfaces_allocated.size(); k++)
+            {
+                if (surfaceIDs[j] == surfaces_allocated[k].returnedSurfaceId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != num_surfaces)
+            {
+                t_ilm_uint dimreturned[2] = {0, 0};
+                t_ilm_uint posreturned[2] = {0, 0};
+
+                // Check dimensions
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_surfaceGetDimension(surfaceIDs[j], dimreturned));
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceWidth,
+                          dimreturned[0]);
+                EXPECT_EQ(surfaces_allocated[index].surfaceProperties.origSourceHeight,
+                          dimreturned[1]);
+
+                // Confirm position
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_surfaceGetPosition(surfaces_allocated[index].returnedSurfaceId,
+                                                 posreturned));
+                ASSERT_EQ(posreturned[0], surfaces_allocated[index].surfaceProperties.sourceX);
+                ASSERT_EQ(posreturned[1], surfaces_allocated[index].surfaceProperties.sourceY);
+            }
+        }
+    }
+
+    surfaces_allocated.clear();
+
+    uint total_layers = layers_allocated.size();
+
+    // remove the layers
+    for (uint i = 0; i < total_layers; i++)
+    {
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerRemoveNotification(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_layerRemove(layers_allocated[i].layerId));
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Get remaining layers
+        ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through remaining surfaces and confirm dimensions are unchanged
+        for (uint j = 0; j < length; j++)
+        {
+
+            uint index = total_layers;
+
+            for (uint k = 0; k < layers_allocated.size(); k++)
+            {
+                if (layerIDs[j] == layers_allocated[k].layerId)
+                {
+                    index = k;
+                    break;
+                }
+            }
+
+            if (index != total_layers)
+            {
+                // Iterate round remaining layers and check dimensions 
+                for (uint k = 0; k < length; k++)
+                {
+                    t_ilm_uint dimreturned[2] = {0, 0};
+                    t_ilm_uint posreturned[2] = {0, 0};
+
+                    EXPECT_EQ(ILM_SUCCESS,
+                              ilm_layerGetDimension(layerIDs[j], dimreturned));
+
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceWidth,
+                              dimreturned[0]);
+                    EXPECT_EQ(layers_allocated[index].layerProperties.origSourceHeight,
+                              dimreturned[1]);
+
+                    // Confirm position
+                    ASSERT_EQ(ILM_SUCCESS,
+                              ilm_layerGetPosition(layers_allocated[index].layerId,
+                                                     posreturned));
+                    ASSERT_EQ(posreturned[0],
+                              layers_allocated[index].layerProperties.sourceX);
+                    ASSERT_EQ(posreturned[1],
+                              layers_allocated[index].layerProperties.sourceY);
+                }
+            }
+        }
+
+        layerIDs.clear();
+    }
+
+    layers_allocated.clear();
+}
