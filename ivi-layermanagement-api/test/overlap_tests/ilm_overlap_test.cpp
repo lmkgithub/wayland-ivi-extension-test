@@ -122,7 +122,7 @@ public:
     std::vector<t_ilm_layer> layer_render_order;
     std::vector<t_ilm_surface> surface_render_order;
     std::vector<t_ilm_uint> v_screenID;
-    std::vector<void (*)()> vectorOfTests;
+    std::vector<void(IlmOverlapTest::*)(void)> vectorOfTests;
 
     static const uint no_formats = 7;
     static const uint no_surfaces = 7;
@@ -144,7 +144,7 @@ public:
 
     void SetUp()
     {
-
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetPropertiesOfSurface);
     }
 
     void TearDown()
@@ -590,6 +590,49 @@ public:
         timesCalled++;
 
         pthread_cond_signal( &waiterVariable );
+    }
+
+    void IlmOverlapTest_ilm_overlapGetPropertiesOfSurface()
+    {
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmSurfaceProperties returnValue;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId, &returnValue));
+
+            // Check opacity
+            EXPECT_NEAR(surfaces_allocated[i].surfaceProperties.opacity,
+                        returnValue.opacity,
+                        0.01);
+
+            // Check source values
+            ASSERT_EQ(returnValue.sourceX,
+                      surfaces_allocated[i].surfaceProperties.sourceX);
+            ASSERT_EQ(returnValue.sourceY,
+                      surfaces_allocated[i].surfaceProperties.sourceY);
+            ASSERT_EQ(returnValue.sourceWidth,
+                      surfaces_allocated[i].surfaceProperties.sourceWidth);
+            ASSERT_EQ(returnValue.sourceHeight,
+                      surfaces_allocated[i].surfaceProperties.sourceHeight);
+
+            // Check destination values
+            ASSERT_EQ(returnValue.sourceX,
+                      surfaces_allocated[i].surfaceProperties.destX);
+            ASSERT_EQ(returnValue.sourceY,
+                      surfaces_allocated[i].surfaceProperties.destY);
+            ASSERT_EQ(returnValue.sourceWidth,
+                      surfaces_allocated[i].surfaceProperties.destWidth);
+            ASSERT_EQ(returnValue.sourceHeight,
+                      surfaces_allocated[i].surfaceProperties.destHeight);
+
+            // Check orientation value
+            ASSERT_EQ(returnValue.orientation,
+                      surfaces_allocated[i].surfaceProperties.orientation);
+
+            // Check visibility value
+            ASSERT_EQ(returnValue.visibility,
+                      surfaces_allocated[i].surfaceProperties.visibility);
+        }
     }
 };
 
