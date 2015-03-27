@@ -34,6 +34,7 @@ add_subdirectory(ivi-layermanagement-api/ilmCommon)
 add_subdirectory(ivi-layermanagement-api/ilmClient)
 add_subdirectory(ivi-layermanagement-api/ilmControl)
 add_subdirectory(ivi-layermanagement-api/test)
+add_subdirectory(ivi-layermanagement-api/test/overlap_tests)
 add_subdirectory(ivi-layermanagement-examples)
 
 
