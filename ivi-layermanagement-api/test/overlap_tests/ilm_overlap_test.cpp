@@ -145,6 +145,7 @@ public:
     void SetUp()
     {
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetPropertiesOfSurface);
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetDimension);
     }
 
     void TearDown()
@@ -632,6 +633,27 @@ public:
             // Check visibility value
             ASSERT_EQ(returnValue.visibility,
                       surfaces_allocated[i].surfaceProperties.visibility);
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetDimension()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             t_ilm_uint dimreturned[2] = {0, 0};
+             EXPECT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetDimension(surfaces_allocated[i].returnedSurfaceId,
+                                               dimreturned));
+
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                       dimreturned[0]) << "Surface: "
+                                       << surfaces_allocated[i].returnedSurfaceId;
+
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceHeight,
+                       dimreturned[1]) << "Surface: "
+                                       << surfaces_allocated[i].returnedSurfaceId;
         }
     }
 };
