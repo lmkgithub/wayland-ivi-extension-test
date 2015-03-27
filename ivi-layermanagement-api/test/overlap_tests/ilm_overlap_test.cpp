@@ -819,3 +819,18 @@ TEST_F(IlmOverlapTest, ilm_overlapGetPropertiesOfLayer)
                   layers_allocated[i].layerProperties.visibility);
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapGetScreenIDs)
+{
+    t_ilm_uint numberOfScreens = 0;
+    t_ilm_uint* screenIDs;
+
+    // Try to get screen IDs using valid pointer for numberOfScreens
+    ASSERT_EQ(ILM_SUCCESS, ilm_getScreenIDs(&numberOfScreens, &screenIDs));
+
+    v_screenID.clear();
+    v_screenID.assign(screenIDs, screenIDs + numberOfScreens);
+    free(screenIDs);
+
+    EXPECT_TRUE(numberOfScreens > 0);
+}
