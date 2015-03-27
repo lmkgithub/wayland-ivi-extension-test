@@ -148,6 +148,7 @@ public:
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetDimension);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetVisibility);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetSourceRectangle);
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetPropertiesOfLayer);
     }
 
     void TearDown()
@@ -777,6 +778,52 @@ public:
                       << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
                       << ", sourceHeight expected: " << surfaces_allocated[i].surfaceProperties.sourceHeight
                       << ", sourceHeight got: " << surfaceProperties.sourceHeight << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapGetPropertiesOfLayer()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             ilmLayerProperties returnValue;
+             // Check Layer source properties
+             EXPECT_EQ(ILM_SUCCESS,
+                       ilm_getPropertiesOfLayer(layers_allocated[i].layerId, &returnValue));
+
+             // Check opacity
+             EXPECT_NEAR(layers_allocated[i].layerProperties.opacity,
+                         returnValue.opacity,
+                         0.01);
+
+             // Check source values
+             EXPECT_EQ(returnValue.sourceX,
+                       layers_allocated[i].layerProperties.sourceX);
+             EXPECT_EQ(returnValue.sourceY,
+                       layers_allocated[i].layerProperties.sourceY);
+             EXPECT_EQ(returnValue.sourceWidth,
+                       layers_allocated[i].layerProperties.sourceWidth);
+             EXPECT_EQ(returnValue.sourceHeight,
+                       layers_allocated[i].layerProperties.sourceHeight);
+
+             // Check destination values
+             EXPECT_EQ(returnValue.sourceX,
+                       layers_allocated[i].layerProperties.destX);
+             EXPECT_EQ(returnValue.sourceY,
+                       layers_allocated[i].layerProperties.destY);
+             EXPECT_EQ(returnValue.sourceWidth,
+                       layers_allocated[i].layerProperties.destWidth);
+             EXPECT_EQ(returnValue.sourceHeight,
+                       layers_allocated[i].layerProperties.destHeight);
+
+             // Check orientation value
+             EXPECT_EQ(returnValue.orientation,
+                       layers_allocated[i].layerProperties.orientation);
+
+             // Check visibility value
+             EXPECT_EQ(returnValue.visibility,
+                       layers_allocated[i].layerProperties.visibility);
         }
     }
 };
