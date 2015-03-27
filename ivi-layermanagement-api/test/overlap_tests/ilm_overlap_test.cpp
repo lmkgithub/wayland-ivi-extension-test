@@ -148,7 +148,8 @@ public:
 
     void SetUp()
     {
-
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetPropertiesOfSurface);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetPropertiesOfSurface");
     }
 
     void TearDown()
@@ -567,6 +568,87 @@ public:
         timesCalled++;
 
         pthread_cond_signal( &waiterVariable );
+    }
+
+    void IlmOverlapTest_ilm_overlapGetPropertiesOfSurface()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmSurfaceProperties returnValue;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &returnValue))
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check opacity
+            EXPECT_NEAR(surfaces_allocated[i].surfaceProperties.opacity,
+                        returnValue.opacity, 0.01)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check source values
+            ASSERT_EQ(returnValue.sourceX,
+                      surfaces_allocated[i].surfaceProperties.sourceX)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceY,
+                      surfaces_allocated[i].surfaceProperties.sourceY)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceWidth,
+                      surfaces_allocated[i].surfaceProperties.sourceWidth)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceHeight,
+                      surfaces_allocated[i].surfaceProperties.sourceHeight)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check destination values
+            ASSERT_EQ(returnValue.sourceX,
+                      surfaces_allocated[i].surfaceProperties.destX)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceY,
+                      surfaces_allocated[i].surfaceProperties.destY)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceWidth,
+                      surfaces_allocated[i].surfaceProperties.destWidth)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceHeight,
+                      surfaces_allocated[i].surfaceProperties.destHeight)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check orientation value
+            ASSERT_EQ(returnValue.orientation,
+                      surfaces_allocated[i].surfaceProperties.orientation)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check visibility value
+            ASSERT_EQ(returnValue.visibility,
+                      surfaces_allocated[i].surfaceProperties.visibility)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+        }
     }
 };
 
