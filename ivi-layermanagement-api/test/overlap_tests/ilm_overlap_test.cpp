@@ -768,3 +768,47 @@ TEST_F(IlmOverlapTest, ilm_overlapSurfaceSetSourceRectangle)
                   << ", sourceHeight got: " << surfaceProperties.sourceHeight << std::endl;
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapGetPropertiesOfLayer)
+{
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        ilmLayerProperties returnValue;
+        // Check Layer source properties
+        EXPECT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[i].layerId, &returnValue));
+
+        // Check opacity
+        EXPECT_NEAR(layers_allocated[i].layerProperties.opacity,
+                    returnValue.opacity,
+                    0.01);
+
+        // Check source values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[i].layerProperties.sourceX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[i].layerProperties.sourceY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[i].layerProperties.sourceWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[i].layerProperties.sourceHeight);
+
+        // Check destination values
+        EXPECT_EQ(returnValue.sourceX,
+                  layers_allocated[i].layerProperties.destX);
+        EXPECT_EQ(returnValue.sourceY,
+                  layers_allocated[i].layerProperties.destY);
+        EXPECT_EQ(returnValue.sourceWidth,
+                  layers_allocated[i].layerProperties.destWidth);
+        EXPECT_EQ(returnValue.sourceHeight,
+                  layers_allocated[i].layerProperties.destHeight);
+
+        // Check orientation value
+        EXPECT_EQ(returnValue.orientation,
+                  layers_allocated[i].layerProperties.orientation);
+
+        // Check visibility value
+        EXPECT_EQ(returnValue.visibility,
+                  layers_allocated[i].layerProperties.visibility);
+    }
+}
