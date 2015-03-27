@@ -150,6 +150,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetPropertiesOfSurface");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetDimension);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetDimension");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetVisibility);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetVisibility");
     }
 
     void TearDown()
@@ -671,6 +673,24 @@ public:
              EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceHeight,
                        dimreturned[1]) << "Surface Id: "
                                        << surfaces_allocated[i].returnedSurfaceId;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetVisibility()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             // Confirm visibility of each surface
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                                &visibility_rtn)) << "Surface: "
+                                                                  << surfaces_allocated[i].returnedSurfaceId;
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                       visibility_rtn)
+                       << "Surface: "  << surfaces_allocated[i].returnedSurfaceId;
         }
     }
 };
