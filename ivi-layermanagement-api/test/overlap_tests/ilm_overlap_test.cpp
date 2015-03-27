@@ -657,3 +657,21 @@ TEST_F(IlmOverlapTest, ilm_overlapSurfaceGetDimension)
                   dimreturned[1]);
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapSurfaceGetVisibility)
+{
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+         // Confirm visibility of each surface
+         t_ilm_bool visibility_rtn;
+         ASSERT_EQ(ILM_SUCCESS,
+                   ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                            &visibility_rtn));
+         EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                   visibility_rtn)
+                   << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                   << ", Visibility Expected: " << surfaces_allocated[i].surfaceProperties.visibility
+                   << ", Visibility Got: " << visibility_rtn << std::endl;
+
+    }
+}
