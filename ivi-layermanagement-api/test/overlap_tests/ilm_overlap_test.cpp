@@ -912,3 +912,31 @@ TEST_F(IlmOverlapTest, ilm_overlapGetSurfaceIDs)
                             , surfaceIDs.end());
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapGetSurfaceIDsOnLayer)
+{
+    t_ilm_int length;
+    t_ilm_uint* IDs;
+    std::vector<t_ilm_surface> surfaceIDs;
+
+    // Loop through expected layers and confirm they are present
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getSurfaceIDsOnLayer(layers_allocated[i].layerId, &length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Check to make sure that all the expected surfaces are assigned.
+        if (surfaceIDs.size() == layers_allocated[i].surfacesOnLayer.size())
+        {
+            for (uint j = 0; j < surfaceIDs.size(); j++)
+            {
+                 EXPECT_NE(std::find(layers_allocated[i].surfacesOnLayer.begin(),
+                           layers_allocated[i].surfacesOnLayer.end(),
+                           surfaceIDs[j]),
+                           layers_allocated[i].surfacesOnLayer.end());
+            }
+        }
+    }
+}
