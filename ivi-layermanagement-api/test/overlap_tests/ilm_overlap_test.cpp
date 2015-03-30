@@ -827,3 +827,25 @@ TEST_F(IlmOverlapTest, ilm_overlapGetScreenIDs)
 
     EXPECT_TRUE(numberOfScreens > 0);
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapGetLayerIDs)
+{
+    t_ilm_int length;
+    t_ilm_layer* IDs;
+    std::vector<t_ilm_layer> layerIDs;
+
+    // Get layers
+    ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+    layerIDs.assign(IDs, IDs + length);
+    free(IDs);
+
+    // Loop through expected layers and confirm they are present
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        EXPECT_NE(std::find(layerIDs.begin(),
+                            layerIDs.end(),
+                            layers_allocated[i].layerId)
+                            , layerIDs.end());
+    }
+}
+
