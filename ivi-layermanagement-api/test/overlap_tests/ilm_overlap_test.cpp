@@ -866,6 +866,51 @@ public:
                               , layerIDs.end());
         }
     }
+
+    void IlmOverlapTest_ilm_overlapGetLayerIDsOnScreen()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_layer* idGotRenderOrder;
+        t_ilm_int    length = 0;
+        std::vector<t_ilm_layer> layerIDs;
+
+        // This assumes only 1 screen for the moment
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getLayerIDsOnScreen(v_screenID[0],
+                                          &length,
+                                          &idGotRenderOrder));
+
+        layerIDs.assign(idGotRenderOrder, idGotRenderOrder + length);
+        free(idGotRenderOrder);
+
+        // Loop through expected layers and confirm they are present
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             ASSERT_NE(std::find(layerIDs.begin(),
+                                 layerIDs.end(),
+                                 layers_allocated[i].layerId)
+                               , layerIDs.end());
+        }
+
+        // Check that the number of layers got match those expected.
+        if (layerIDs.size() != layer_render_order.size())
+        {
+            ASSERT_EQ(true, false) << "No of layers retrieved don't match expected"
+                                   << "Got: " << layerIDs.size() << ", "
+                                   << "Expected: " << layer_render_order.size()
+                                   << std::endl;
+        }
+
+        // Check got render order matches that expected
+        for (uint i = 0; i < layerIDs.size(); i++)
+        {
+             ASSERT_EQ(layer_render_order[i], layerIDs[i]);
+        }
+
+        // Clean-up
+        layerIDs.clear();
+    }
 };
 
 // Pointers where to put received values for current Test
