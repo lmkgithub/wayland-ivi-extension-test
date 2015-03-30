@@ -151,6 +151,9 @@ public:
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetPropertiesOfLayer);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetScreenIDs);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetLayerIDs);
+            // Note this needs putting in the correct place
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetLayerIDsOnScreen);
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetSurfaceIDs);
     }
 
     void TearDown()
@@ -910,6 +913,29 @@ public:
 
         // Clean-up
         layerIDs.clear();
+    }
+
+    void IlmOverlapTest_ilm_overlapGetSurfaceIDs()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        // Get surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through expected surfaces and confirm they are present
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             EXPECT_NE(std::find(surfaceIDs.begin(),
+                                 surfaceIDs.end(),
+                                 surfaces_allocated[i].returnedSurfaceId)
+                               , surfaceIDs.end());
+        }
     }
 };
 
