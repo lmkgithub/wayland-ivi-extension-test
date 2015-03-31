@@ -940,3 +940,19 @@ TEST_F(IlmOverlapTest, ilm_overlapGetSurfaceIDsOnLayer)
         }
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapSurfaceGetOrientation)
+{
+    // Check Orientations of surfaces
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        ilmOrientation returned;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceGetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                  &returned));
+        ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
+            << " - Surface: " << surfaces_allocated[i].returnedSurfaceId
+            << ", Orientation Expected: " << surfaces_allocated[i].surfaceProperties.orientation
+            << ", Orientation Got: " << returned << std::endl;
+    }
+}
