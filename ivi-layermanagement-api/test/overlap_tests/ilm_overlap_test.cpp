@@ -1021,3 +1021,66 @@ TEST_F(IlmOverlapTest, ilm_overlapSurfaceSetOrientation)
             << ", Orientation Got: " << returned << std::endl;
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapSurfaceSetVisibility)
+{
+    t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+         // Confirm visibility of each surface
+         t_ilm_bool visibility_rtn;
+         ASSERT_EQ(ILM_SUCCESS,
+                   ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                            &visibility_rtn));
+         EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                   visibility_rtn)
+                   << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                   << ", Visibility Expected: " << surfaces_allocated[i].surfaceProperties.visibility
+                   << ", Visibility Got: " << visibility_rtn << std::endl;
+
+    }
+
+    if (surfaces_allocated.size() > 0)
+    {
+        // Set random surface index
+        uint random_surface = rand() % surfaces_allocated.size();
+
+        // Create random value for visibility
+        t_ilm_bool random_visibility = visibility[rand() % 2];
+
+        // Set callback
+        callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+        // Set visibility
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_surfaceSetVisibility(surfaces_allocated[random_surface].returnedSurfaceId,
+                                           random_visibility));
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Update stored orientation for surface
+        surfaces_allocated[random_surface].surfaceProperties.visibility = random_visibility;
+
+        // Check notification state if set
+        if (surfaces_allocated[random_surface].notificationState)
+        {
+            assertCallbackcalled();
+        }
+    }
+
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+         // Confirm visibility of each surface after change
+         t_ilm_bool visibility_rtn;
+         ASSERT_EQ(ILM_SUCCESS,
+                   ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                            &visibility_rtn));
+         EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                   visibility_rtn)
+                   << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                   << ", Visibility Expected: " << surfaces_allocated[i].surfaceProperties.visibility
+                   << ", Visibility Got: " << visibility_rtn << std::endl;
+
+    }
+}
