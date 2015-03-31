@@ -180,6 +180,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetDestinationRectangle");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle");
     }
 
     void TearDown()
@@ -1308,6 +1310,40 @@ public:
                       << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
                       << ", destHeight expected: " << surfaces_allocated[i].surfaceProperties.destHeight
                       << ", destHeight got: " << surfaceProperties.destHeight << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm source rectangle
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties));
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceX,
+                      surfaceProperties.sourceX)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                      << ", sourceX expected: " << surfaces_allocated[i].surfaceProperties.sourceX
+                      << ", sourceX got: " << surfaceProperties.sourceX << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceY,
+                      surfaceProperties.sourceY)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                      << ", sourceY expected: " << surfaces_allocated[i].surfaceProperties.sourceY
+                      << ", sourceY got: " << surfaceProperties.sourceY << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destWidth,
+                      surfaceProperties.destWidth)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                      << ", sourceWidth expected: " << surfaces_allocated[i].surfaceProperties.sourceWidth
+                      << ", sourceWidth got: " << surfaceProperties.sourceWidth << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceHeight,
+                      surfaceProperties.sourceHeight)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                      << ", sourceHeight expected: " << surfaces_allocated[i].surfaceProperties.sourceHeight
+                      << ", sourceHeight got: " << surfaceProperties.sourceHeight << std::endl;
         }
     }
 };
