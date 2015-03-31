@@ -1084,3 +1084,36 @@ TEST_F(IlmOverlapTest, ilm_overlapSurfaceSetVisibility)
 
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapSurfaceGetDestinationRectangle)
+{
+    for (uint i = 0; i < surfaces_allocated.size(); i++)
+    {
+        // Confirm source rectangle
+        ilmSurfaceProperties surfaceProperties;
+        // Confirm destination rectangle
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                             &surfaceProperties));
+        ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destX,
+                  surfaceProperties.destX)
+                  << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                  << ", destX expected: " << surfaces_allocated[i].surfaceProperties.destX
+                  << ", destX got: " << surfaceProperties.destX << std::endl;
+        ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destY,
+                  surfaceProperties.destY)
+                  << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                  << ", destY expected: " << surfaces_allocated[i].surfaceProperties.destY
+                  << ", destY got: " << surfaceProperties.destY << std::endl;
+        ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destWidth,
+                  surfaceProperties.destWidth)
+                  << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                  << ", destWidth expected: " << surfaces_allocated[i].surfaceProperties.destWidth
+                  << ", destWidth got: " << surfaceProperties.destWidth << std::endl;
+        ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destHeight,
+                  surfaceProperties.destHeight)
+                  << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                  << ", destHeight expected: " << surfaces_allocated[i].surfaceProperties.destHeight
+                  << ", destHeight got: " << surfaceProperties.destHeight << std::endl;
+    }
+}
