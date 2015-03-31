@@ -170,6 +170,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetSurfaceIDsOnLayer");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetOrientation);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetOrientation");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetOrientation);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetOrientation");
     }
 
     void TearDown()
@@ -1064,6 +1066,71 @@ public:
              ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
                    << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceSetOrientation()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check Orientations of surfaces
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceGetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                      &returned))
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
+        }
+
+        // Pick random surface and change
+        uint random_surface = rand() % surfaces_allocated.size();
+        e_ilmOrientation random_orientation
+            = orientation[rand() % no_orientations];
+        callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+        if (surfaces_allocated.size() > 0)
+        {
+            // Set a random surface a random orientation
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetOrientation(surfaces_allocated[random_surface].returnedSurfaceId,
+                                                random_orientation))
+                        << "Surface Id: " << surfaces_allocated[random_surface].returnedSurfaceId
+                        << ", Orientation: " << random_orientation << std::endl;
+
+            // Update stored orientation for surface
+            surfaces_allocated[random_surface].surfaceProperties.orientation = random_orientation;
+
+            std::cout << "Changing orientation of Surface Id: "
+                      << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", to: Orientation: " << random_orientation << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Check notification state if set
+            if (surfaces_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Check Orientations of surfaces again
+        // Make sure changing one hasn't modified others
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceGetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                      &returned))
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
         }
     }
 };
