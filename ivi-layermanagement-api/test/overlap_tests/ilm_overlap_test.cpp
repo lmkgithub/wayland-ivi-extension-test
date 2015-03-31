@@ -174,6 +174,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetVisibility");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetDestinationRectangle);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetDestinationRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle");
     }
 
     void TearDown()
@@ -1223,6 +1225,109 @@ public:
             ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destHeight,
                       surfaceProperties.destHeight)
                       << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Confirm destination rectangles before change
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm destination rectangle for each surface
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destX,
+                      surfaceProperties.destX)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destY,
+                      surfaceProperties.destY)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destWidth,
+                      surfaceProperties.destWidth)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destHeight,
+                      surfaceProperties.destHeight)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+        }
+
+        if (surfaces_allocated.size() > 0)
+        {
+            // Set random surface index
+            uint random_surface = rand() % surfaces_allocated.size();
+
+            // Create random values
+            t_ilm_uint random_destX = rand();
+            t_ilm_uint random_destY = rand();
+            t_ilm_uint random_destWidth = rand();
+            t_ilm_uint random_destHeight = rand();
+
+            // Set callback
+            callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+            // Set destination rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetDestinationRectangle(surfaces_allocated[random_surface].returnedSurfaceId,
+                                                         random_destX,
+                                                         random_destY,
+                                                         random_destWidth,
+                                                         random_destHeight))
+                      << "Surface Id: "  << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", Dest X: " << random_destX
+                      << ", Dest Y: " << random_destY
+                      << ", Dest Width: " << random_destWidth
+                      << ", Dest Height: " << random_destHeight << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for surface
+            surfaces_allocated[random_surface].surfaceProperties.destX = random_destX;
+            surfaces_allocated[random_surface].surfaceProperties.destY = random_destY;
+            surfaces_allocated[random_surface].surfaceProperties.destWidth = random_destWidth;
+            surfaces_allocated[random_surface].surfaceProperties.destHeight = random_destHeight;
+
+            // Check notification state if set
+            if (surfaces_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Confirm all destination rectangles after change
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm destination rectangle for each surface
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destX,
+                      surfaceProperties.destX)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destY,
+                      surfaceProperties.destY)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destWidth,
+                      surfaceProperties.destWidth)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destHeight,
+                      surfaceProperties.destHeight)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
                           << std::endl;
         }
     }
