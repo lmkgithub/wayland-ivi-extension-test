@@ -170,6 +170,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetOrientation");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetOrientation);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetOrientation");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetVisibility);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetVisibility");
     }
 
     void TearDown()
@@ -1118,6 +1120,76 @@ public:
             ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
                 << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
                     << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceSetVisibility()
+    {
+        t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             // Confirm visibility of each surface
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                                &visibility_rtn))
+                       << "Surface Id: "
+                           << surfaces_allocated[i].returnedSurfaceId
+                       << std::endl;
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                       visibility_rtn)
+                       << "Surface Id: "
+                           << surfaces_allocated[i].returnedSurfaceId
+                       << std::endl;
+
+        }
+
+        if (surfaces_allocated.size() > 0)
+        {
+            // Set random surface index
+            uint random_surface = rand() % surfaces_allocated.size();
+
+            // Create random value for visibility
+            t_ilm_bool random_visibility = visibility[rand() % 2];
+
+            // Set callback
+            callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+            // Set visibility
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetVisibility(surfaces_allocated[random_surface].returnedSurfaceId,
+                                               random_visibility))
+                      << "Surface Id: "
+                      << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", Visibility: " << random_visibility << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for surface
+            surfaces_allocated[random_surface].surfaceProperties.visibility = random_visibility;
+
+            // Check notification state if set
+            if (surfaces_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             // Confirm visibility of each surface after change
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                                &visibility_rtn));
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                       visibility_rtn)
+                       << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                           << std::endl;
+
         }
     }
 };
