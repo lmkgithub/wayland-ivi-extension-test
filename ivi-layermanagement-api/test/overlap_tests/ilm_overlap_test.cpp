@@ -165,6 +165,7 @@ public:
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetOrientation);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetVisibility);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetVisibility);
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle);
     }
 
     void TearDown()
@@ -1449,6 +1450,41 @@ public:
                        << ", Visibility Expected: " << layers_allocated[i].layerProperties.visibility
                        << ", Visibility Got: " << visibility_rtn << std::endl;
 
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm source rectangle
+            ilmLayerProperties layerProperties;
+            // Confirm destination rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties));
+            ASSERT_EQ(layers_allocated[i].layerProperties.destX,
+                      layerProperties.destX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", destX expected: " << layers_allocated[i].layerProperties.destX
+                      << ", destX got: " << layerProperties.destX << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destY,
+                      layerProperties.destY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", destY expected: " << layers_allocated[i].layerProperties.destY
+                      << ", destY got: " << layerProperties.destY << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destWidth,
+                      layerProperties.destWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", destWidth expected: " << layers_allocated[i].layerProperties.destWidth
+                      << ", destWidth got: " << layerProperties.destWidth << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
+                      layerProperties.destHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", destHeight expected: " << layers_allocated[i].layerProperties.destHeight
+                      << ", destHeight got: " << layerProperties.destHeight << std::endl;
         }
     }
 };
