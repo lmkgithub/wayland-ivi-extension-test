@@ -1249,3 +1249,19 @@ TEST_F(IlmOverlapTest, ilm_overlapSurfaceGetSourceRectangle)
                   << ", sourceHeight got: " << surfaceProperties.sourceHeight << std::endl;
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapLayerGetOrientation)
+{
+    // Check Orientations of surfaces
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        ilmOrientation returned;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerGetOrientation(layers_allocated[i].layerId,
+                  &returned));
+        ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
+            << " - Layer: " << layers_allocated[i].layerId
+            << ", Orientation Expected: " << layers_allocated[i].layerProperties.orientation
+            << ", Orientation Got: " << returned << std::endl;
+    }
+}
