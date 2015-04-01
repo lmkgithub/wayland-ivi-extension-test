@@ -184,6 +184,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetOrientation");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetVisibility);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetVisibility");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetVisibility);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetVisibility");
     }
 
     void TearDown()
@@ -1463,6 +1465,73 @@ public:
              EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
                        visibility_rtn)
                        << "Layer: "  << layers_allocated[i].layerId
+                           << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerSetVisibility()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             // Confirm visibility of each layer
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                                &visibility_rtn))
+                       << "Layer Id: "  << layers_allocated[i].layerId
+                           << std::endl;
+             EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                       visibility_rtn)
+                       << "Layer Id: "  << layers_allocated[i].layerId
+                           << std::endl;
+
+        }
+
+        if (layers_allocated.size() > 0)
+        {
+            // Set random layer index
+            uint random_layer = rand() % layers_allocated.size();
+
+            // Create random value for visibility
+            t_ilm_bool random_visibility = visibility[rand() % 2];
+
+            // Set callback
+            callbackLayerId = layers_allocated[random_layer].layerId;
+
+            // Set visibility
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetVisibility(layers_allocated[random_layer].layerId,
+                                             random_visibility))
+                       << "Layer Id: "  << layers_allocated[random_layer].layerId
+                       << ", Visibility: " << random_visibility << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for layer
+            layers_allocated[random_layer].layerProperties.visibility = random_visibility;
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             // Confirm visibility of each layer after change
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                                &visibility_rtn))
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                       visibility_rtn)
+                       << "Layer Id: "  << layers_allocated[i].layerId
                            << std::endl;
         }
     }
