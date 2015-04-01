@@ -162,6 +162,7 @@ public:
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetOrientation);
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetOrientation);
     }
 
     void TearDown()
@@ -1298,6 +1299,68 @@ public:
                       &returned));
             ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
                 << " - Layer: " << layers_allocated[i].layerId
+                << ", Orientation Expected: " << layers_allocated[i].layerProperties.orientation
+                << ", Orientation Got: " << returned << std::endl;
+        }
+    }
+
+
+    void IlmOverlapTest_ilm_overlapLayerSetOrientation()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        e_ilmOrientation orientation[4] = {ILM_ZERO, ILM_NINETY,
+                                           ILM_ONEHUNDREDEIGHTY,
+                                           ILM_TWOHUNDREDSEVENTY};
+
+        // Check Orientations of layers
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerGetOrientation(layers_allocated[i].layerId,
+                      &returned));
+            ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
+                << " - Layer: " << layers_allocated[i].layerId
+                << ", Orientation Expected: " << layers_allocated[i].layerProperties.orientation
+                << ", Orientation Got: " << returned << std::endl;
+        }
+
+        // Pick random layer and change
+        uint random_layer = rand() % layers_allocated.size();
+        e_ilmOrientation random_orientation = orientation[rand() % 4];
+        callbackLayerId = layers_allocated[random_layer].layerId;
+
+        if (layers_allocated.size() > 0)
+        {
+            // Set a random layer a random orientation
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetOrientation(layers_allocated[random_layer].layerId,
+                                              random_orientation));
+
+            // Update stored orientation for layer
+            layers_allocated[random_layer].layerProperties.orientation
+                = random_orientation;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Check Orientations of layers again
+        // Make sure changing one hasn't modified others
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerGetOrientation(layers_allocated[i].layerId,
+                      &returned));
+            ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
+                << " - Layers: " << layers_allocated[i].layerId
                 << ", Orientation Expected: " << layers_allocated[i].layerProperties.orientation
                 << ", Orientation Got: " << returned << std::endl;
         }
