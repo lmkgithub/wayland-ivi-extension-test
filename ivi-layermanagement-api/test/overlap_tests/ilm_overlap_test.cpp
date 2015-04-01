@@ -186,6 +186,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetVisibility");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetVisibility);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetVisibility");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle");
     }
 
     void TearDown()
@@ -1533,6 +1535,38 @@ public:
                        visibility_rtn)
                        << "Layer Id: "  << layers_allocated[i].layerId
                            << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmLayerProperties layerProperties;
+            // Confirm destination rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destX,
+                      layerProperties.destX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destY,
+                      layerProperties.destY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destWidth,
+                      layerProperties.destWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
+                      layerProperties.destHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
         }
     }
 };
