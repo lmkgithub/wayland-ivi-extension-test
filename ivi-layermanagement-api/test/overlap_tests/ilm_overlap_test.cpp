@@ -182,6 +182,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetOrientation);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetOrientation");
     }
 
     void TearDown()
@@ -1344,6 +1346,24 @@ public:
                       << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
                       << ", sourceHeight expected: " << surfaces_allocated[i].surfaceProperties.sourceHeight
                       << ", sourceHeight got: " << surfaceProperties.sourceHeight << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetOrientation()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check Orientations of surfaces
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerGetOrientation(layers_allocated[i].layerId,
+                      &returned));
+            ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
+                << " - Layer: " << layers_allocated[i].layerId
+                << ", Orientation Expected: " << layers_allocated[i].layerProperties.orientation
+                << ", Orientation Got: " << returned << std::endl;
         }
     }
 };
