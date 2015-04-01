@@ -196,6 +196,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetDestinationRectangle");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetSourceRectangle);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetSourceRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetSourceRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetSourceRectangle");
     }
 
     void TearDown()
@@ -1669,6 +1671,108 @@ public:
         for (uint i = 0; i < layers_allocated.size(); i++)
         {
             // Confirm source rectangle
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties));
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceX,
+                      layerProperties.sourceX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceX expected: " << layers_allocated[i].layerProperties.sourceX
+                      << ", sourceX got: " << layerProperties.sourceX << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceY,
+                      layerProperties.sourceY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceY expected: " << layers_allocated[i].layerProperties.sourceY
+                      << ", sourceY got: " << layerProperties.sourceY << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceWidth,
+                      layerProperties.sourceWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceWidth expected: " << layers_allocated[i].layerProperties.sourceWidth
+                      << ", sourceWidth got: " << layerProperties.sourceWidth << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceHeight,
+                      layerProperties.sourceHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceHeight expected: " << layers_allocated[i].layerProperties.sourceHeight
+                      << ", sourceHeight got: " << layerProperties.sourceHeight << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerSetSourceRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Confirm layer rectangles before change
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm source rectangle for each layer
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties));
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceX,
+                      layerProperties.sourceX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceX expected: " << layers_allocated[i].layerProperties.sourceX
+                      << ", sourceX got: " << layerProperties.sourceX << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceY,
+                      layerProperties.sourceY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceY expected: " << layers_allocated[i].layerProperties.sourceY
+                      << ", sourceY got: " << layerProperties.sourceY << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceWidth,
+                      layerProperties.sourceWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceWidth expected: " << layers_allocated[i].layerProperties.sourceWidth
+                      << ", sourceWidth got: " << layerProperties.sourceWidth << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceHeight,
+                      layerProperties.sourceHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                      << ", sourceHeight expected: " << layers_allocated[i].layerProperties.sourceHeight
+                      << ", sourceHeight got: " << layerProperties.sourceHeight << std::endl;
+        }
+
+        if (layers_allocated.size() > 0)
+        {
+            // Set random surface index
+            uint random_surface = rand() % layers_allocated.size();
+
+            // Create random values
+            t_ilm_uint random_sourceX = rand();
+            t_ilm_uint random_sourceY = rand();
+            t_ilm_uint random_sourceWidth = rand();
+            t_ilm_uint random_sourceHeight = rand();
+
+            // Set callback
+            callbackLayerId = layers_allocated[random_surface].layerId;
+
+            // Set source rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetSourceRectangle(layers_allocated[random_surface].layerId,
+                                                    random_sourceX,
+                                                    random_sourceY,
+                                                    random_sourceWidth,
+                                                    random_sourceHeight));
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for surface
+            layers_allocated[random_surface].layerProperties.sourceX = random_sourceX;
+            layers_allocated[random_surface].layerProperties.sourceY = random_sourceY;
+            layers_allocated[random_surface].layerProperties.sourceWidth = random_sourceWidth;
+            layers_allocated[random_surface].layerProperties.sourceHeight = random_sourceHeight;
+
+            // Check notification state if set
+            if (layers_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Confirm all source rectangles after change
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm source rectangle for each surface
             ilmLayerProperties layerProperties;
             ASSERT_EQ(ILM_SUCCESS,
                       ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
