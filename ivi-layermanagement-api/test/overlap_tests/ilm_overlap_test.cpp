@@ -198,6 +198,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetSourceRectangle");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetSourceRectangle);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetSourceRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetRenderOrder);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetRenderOrder");
     }
 
     void TearDown()
@@ -1797,6 +1799,139 @@ public:
                       << "Layer: "  << layers_allocated[i].layerId
                       << ", sourceHeight expected: " << layers_allocated[i].layerProperties.sourceHeight
                       << ", sourceHeight got: " << layerProperties.sourceHeight << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerSetRenderOrder()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check current render order matches expected
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             t_ilm_int length;
+             t_ilm_uint* IDs;
+             std::vector<t_ilm_surface> gotSurfaces;
+
+             // Get surfaces on layer and set local vector
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_getSurfaceIDsOnLayer(layers_allocated[i].layerId,
+                                                &length, &IDs));
+             gotSurfaces.assign(IDs, IDs + length);
+             free(IDs);
+
+             // Set local reference for surfaces on layer
+             std::vector<t_ilm_surface>& surfaces
+                 = layers_allocated[i].surfacesOnLayer;
+
+             // Check for mismatch in sizes
+             if (surfaces.size() != gotSurfaces.size())
+             {
+                 std::cout << "Mismatch between got render order and expected"
+                           << std::endl;
+                 std::cout << "Expected render order" << std::endl;
+                 for (uint j = 0; j < surfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << surfaces[j] << std::endl;
+                 }
+                 std::cout << "Got render order" << std::endl;
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << gotSurfaces[j] << std::endl;
+                 }
+             }
+             else
+             {
+                 // Check for individual differences
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      EXPECT_EQ(surfaces[j], gotSurfaces[j])
+                                << "Mismatch between got render order and expected"
+                                << std::endl;
+                 }
+             }
+        }
+
+        // Re-order render order
+        {
+            // Pick a random layer to change the render order on
+            uint random_layer = rand() % layers_allocated.size();
+
+            // Get local copy of surfaces on selected layer
+            std::vector<t_ilm_surface>& surfacesOnRandomLayer
+                = layers_allocated[random_layer].surfacesOnLayer;
+
+            // Set constant for number of surfaces to be considered
+            const uint noSurfaces = surfacesOnRandomLayer.size();
+
+            // Shuffle the order
+            std::random_shuffle(surfacesOnRandomLayer.begin(),
+                                surfacesOnRandomLayer.end());
+
+            // Set a render order array
+            t_ilm_uint* renderOrderIDs = &surfacesOnRandomLayer[0];
+
+            // Loop through and set the layers render order
+            for (uint i = 0; i < noSurfaces; i++)
+            {
+                EXPECT_EQ(ILM_SUCCESS,
+                          ilm_layerSetRenderOrder(layers_allocated[random_layer].layerId,
+                                                  &(renderOrderIDs[i]), i));
+            }
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled(noSurfaces);
+            }
+        }
+
+        // Re-check current render order matches expected
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             t_ilm_int length;
+             t_ilm_surface* IDs;
+             std::vector<t_ilm_surface> gotSurfaces;
+
+             // Get surfaces on layer and set local vector
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_getSurfaceIDsOnLayer(layers_allocated[i].layerId,
+                                                &length, &IDs));
+             gotSurfaces.assign(IDs, IDs + length);
+             free(IDs);
+
+             // Set local reference for surfaces on layer
+             std::vector<t_ilm_surface>& surfaces
+                 = layers_allocated[i].surfacesOnLayer;
+
+             // Check for mismatch in sizes
+             if (surfaces.size() != gotSurfaces.size())
+             {
+                 std::cout << "Mismatch between got render order and expected"
+                           << std::endl;
+                 std::cout << "Expected render order" << std::endl;
+                 for (uint j = 0; j < surfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << surfaces[j] << std::endl;
+                 }
+                 std::cout << "Got render order" << std::endl;
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << gotSurfaces[j] << std::endl;
+                 }
+             }
+             else
+             {
+                 // Check for individual differences
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      EXPECT_EQ(surfaces[j], gotSurfaces[j])
+                                << "Mismatch between got render order and expected"
+                                << std::endl;
+                 }
+             }
         }
     }
 };
