@@ -192,6 +192,8 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetDestinationRectangle);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetDestinationRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetSourceRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetSourceRectangle");
     }
 
     void TearDown()
@@ -1713,6 +1715,38 @@ public:
                           << std::endl;
             ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
                       layerProperties.destHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetSourceRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm source rectangle
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceX,
+                      layerProperties.sourceX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceY,
+                      layerProperties.sourceY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceWidth,
+                      layerProperties.sourceWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceHeight,
+                      layerProperties.sourceHeight)
                       << "Layer: "  << layers_allocated[i].layerId
                           << std::endl;
         }
