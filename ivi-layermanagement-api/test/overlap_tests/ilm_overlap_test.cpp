@@ -1438,3 +1438,103 @@ TEST_F(IlmOverlapTest, ilm_overlapLayerGetDestinationRectangle)
                   << ", destHeight got: " << layerProperties.destHeight << std::endl;
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapLayerSetDestinationRectangle)
+{
+    // Confirm destination rectangles before change
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        // Confirm destination rectangle for each layer
+        ilmLayerProperties layerProperties;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                             &layerProperties));
+        ASSERT_EQ(layers_allocated[i].layerProperties.destX,
+                  layerProperties.destX)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destX expected: " << layers_allocated[i].layerProperties.destX
+                  << ", destX got: " << layerProperties.destX << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.destY,
+                  layerProperties.destY)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destY expected: " << layers_allocated[i].layerProperties.destY
+                  << ", destY got: " << layerProperties.destY << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.destWidth,
+                  layerProperties.destWidth)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destWidth expected: " << layers_allocated[i].layerProperties.destWidth
+                  << ", destWidth got: " << layerProperties.destWidth << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
+                  layerProperties.destHeight)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destHeight expected: " << layers_allocated[i].layerProperties.destHeight
+                  << ", destHeight got: " << layerProperties.destHeight << std::endl;
+    }
+
+    if (layers_allocated.size() > 0)
+    {
+        // Set random layer index
+        uint random_layer = rand() % layers_allocated.size();
+
+        // Create random values
+        t_ilm_uint random_destX = rand();
+        t_ilm_uint random_destY = rand();
+        t_ilm_uint random_destWidth = rand();
+        t_ilm_uint random_destHeight = rand();
+
+        // Set callback
+        callbackLayerId = layers_allocated[random_layer].layerId;
+
+        // Set destination rectangle
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetDestinationRectangle(layers_allocated[random_layer].layerId,
+                                                     random_destX,
+                                                     random_destY,
+                                                     random_destWidth,
+                                                     random_destHeight));
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Update stored orientation for layer
+        layers_allocated[random_layer].layerProperties.destX = random_destX;
+        layers_allocated[random_layer].layerProperties.destY = random_destY;
+        layers_allocated[random_layer].layerProperties.destWidth = random_destWidth; 
+        layers_allocated[random_layer].layerProperties.destHeight = random_destHeight;
+
+        // Check notification state if set
+        if (layers_allocated[random_layer].notificationState)
+        {
+            assertCallbackcalled();
+        }
+    }
+
+    // Confirm all destination rectangles after change
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        // Confirm destination rectangle for each layer
+        ilmLayerProperties layerProperties;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                             &layerProperties));
+        ASSERT_EQ(layers_allocated[i].layerProperties.destX,
+                  layerProperties.destX)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destX expected: " << layers_allocated[i].layerProperties.destX
+                  << ", destX got: " << layerProperties.destX << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.destY,
+                  layerProperties.destY)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destY expected: " << layers_allocated[i].layerProperties.destY
+                  << ", destY got: " << layerProperties.destY << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.destWidth,
+                  layerProperties.destWidth)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destWidth expected: " << layers_allocated[i].layerProperties.destWidth
+                  << ", destWidth got: " << layerProperties.destWidth << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
+                  layerProperties.destHeight)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", destHeight expected: " << layers_allocated[i].layerProperties.destHeight
+                  << ", destHeight got: " << layerProperties.destHeight << std::endl;
+    }
+}
