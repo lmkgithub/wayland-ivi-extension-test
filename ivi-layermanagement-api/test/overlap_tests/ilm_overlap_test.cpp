@@ -1342,3 +1342,66 @@ TEST_F(IlmOverlapTest, ilm_overlapLayerGetVisibility)
 
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapLayerSetVisibility)
+{
+    t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+         // Confirm visibility of each layer
+         t_ilm_bool visibility_rtn;
+         ASSERT_EQ(ILM_SUCCESS,
+                   ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                            &visibility_rtn));
+         EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                   visibility_rtn)
+                   << "Layer: "  << layers_allocated[i].layerId
+                   << ", Visibility Expected: " << layers_allocated[i].layerProperties.visibility
+                   << ", Visibility Got: " << visibility_rtn << std::endl;
+
+    }
+
+    if (layers_allocated.size() > 0)
+    {
+        // Set random layer index
+        uint random_layer = rand() % layers_allocated.size();
+
+        // Create random value for visibility
+        t_ilm_bool random_visibility = visibility[rand() % 2];
+
+        // Set callback
+        callbackLayerId = layers_allocated[random_layer].layerId;
+
+        // Set visibility
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_layerSetVisibility(layers_allocated[random_layer].layerId,
+                                         random_visibility));
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+        // Update stored orientation for layer
+        layers_allocated[random_layer].layerProperties.visibility = random_visibility;
+
+        // Check notification state if set
+        if (layers_allocated[random_layer].notificationState)
+        {
+            assertCallbackcalled();
+        }
+    }
+
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+         // Confirm visibility of each layer after change
+         t_ilm_bool visibility_rtn;
+         ASSERT_EQ(ILM_SUCCESS,
+                   ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                            &visibility_rtn));
+         EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                   visibility_rtn)
+                   << "Layer: "  << layers_allocated[i].layerId
+                   << ", Visibility Expected: " << layers_allocated[i].layerProperties.visibility
+                   << ", Visibility Got: " << visibility_rtn << std::endl;
+
+    }
+}
