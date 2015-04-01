@@ -1538,3 +1538,35 @@ TEST_F(IlmOverlapTest, ilm_overlapLayerSetDestinationRectangle)
                   << ", destHeight got: " << layerProperties.destHeight << std::endl;
     }
 }
+
+TEST_F(IlmOverlapTest, ilm_overlapLayerGetSourceRectangle)
+{
+    for (uint i = 0; i < layers_allocated.size(); i++)
+    {
+        // Confirm source rectangle
+        ilmLayerProperties layerProperties;
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                           &layerProperties));
+        ASSERT_EQ(layers_allocated[i].layerProperties.sourceX,
+                  layerProperties.sourceX)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", sourceX expected: " << layers_allocated[i].layerProperties.sourceX
+                  << ", sourceX got: " << layerProperties.sourceX << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.sourceY,
+                  layerProperties.sourceY)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", sourceY expected: " << layers_allocated[i].layerProperties.sourceY
+                  << ", sourceY got: " << layerProperties.sourceY << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.sourceWidth,
+                  layerProperties.sourceWidth)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", sourceWidth expected: " << layers_allocated[i].layerProperties.sourceWidth
+                  << ", sourceWidth got: " << layerProperties.sourceWidth << std::endl;
+        ASSERT_EQ(layers_allocated[i].layerProperties.sourceHeight,
+                  layerProperties.sourceHeight)
+                  << "Layer: "  << layers_allocated[i].layerId
+                  << ", sourceHeight expected: " << layers_allocated[i].layerProperties.sourceHeight
+                  << ", sourceHeight got: " << layerProperties.sourceHeight << std::endl;
+    }
+}
