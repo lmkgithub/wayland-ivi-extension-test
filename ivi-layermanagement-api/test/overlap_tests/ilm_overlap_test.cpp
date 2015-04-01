@@ -163,6 +163,7 @@ public:
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetOrientation);
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetOrientation);
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetVisibility);
     }
 
     void TearDown()
@@ -1363,6 +1364,25 @@ public:
                 << " - Layers: " << layers_allocated[i].layerId
                 << ", Orientation Expected: " << layers_allocated[i].layerProperties.orientation
                 << ", Orientation Got: " << returned << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetVisibility()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             // Confirm visibility of each surface
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                              &visibility_rtn));
+             EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                       visibility_rtn)
+                       << "Layer: "  << layers_allocated[i].layerId
+                       << ", Visibility Expected: " << layers_allocated[i].layerProperties.visibility
+                       << ", Visibility Got: " << visibility_rtn << std::endl;
         }
     }
 };
