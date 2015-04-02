@@ -643,3 +643,11 @@ struct ilmLayerProperties IlmOverlapTest::LayerProperties;
 unsigned int IlmOverlapTest::mask;
 t_ilm_surface IlmOverlapTest::surface;
 ilmSurfaceProperties IlmOverlapTest::SurfaceProperties;
+
+TEST_F(IlmOverlapTest, ilm_overlapRun)
+{
+    for (uint i = 0; i < vectorOfTests.size(); i++)
+    {
+        (this->*vectorOfTests[i])();
+    }
+}
