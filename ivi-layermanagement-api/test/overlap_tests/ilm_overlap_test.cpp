@@ -677,3 +677,73 @@ std::vector<void(IlmOverlapTest::*)(void)> IlmOverlapTest::vectorOfTestSet;
 bool IlmOverlapTest::randomize;
 int IlmOverlapTest::no_iterations;
 std::string configurationFileName;
+
+TEST_F(IlmOverlapTest, ilm_overlapRun)
+{
+    uint count = 0;
+
+    // Note for infinity if no_iterations goes negative
+    // the while loop cases will never end.
+
+    // Check if a valid test set has been configured
+    if (vectorOfTestSet.size() == 0)
+    {
+        // Check for random selection from all tests
+        if (randomize)
+        {
+            // Check if the number of expected iterations have been reached
+            while (count != no_iterations)
+            {
+                // Access a random test function
+                (this->*vectorOfTests[rand() % vectorOfTests.size()])();
+                count++;
+            }
+        }
+        else
+        {
+            // Iterate through all tests a number of times
+            while (count != no_iterations)
+            {
+                // Iterate through all tests
+                for (uint i = 0; i < vectorOfTests.size(); i++)
+                {
+                    // Access next test in sequence
+                    (this->*vectorOfTests[i])();
+                }
+
+                // Increment iteration counter
+                count++;
+            }
+        }
+    }
+    else
+    {
+        // Check for random selection from specified test set
+        if (randomize)
+        {
+            // Check if the required number of random selections is met.
+            while (count != no_iterations)
+            {
+                // Accees a random test function from the requested set
+                (this->*vectorOfTestSet[rand() % vectorOfTestSet.size()])();
+                count++;
+            }
+        }
+        else
+        {
+            // Iterate through all tests in the selected set a number of times
+            while (count != no_iterations)
+            {
+                // Iterate through all tests
+                for (uint i = 0; i < vectorOfTestSet.size(); i++)
+                {
+                    // Access next test in sequence
+                    (this->*vectorOfTestSet[i])();
+                }
+
+                // Increment iteration counter
+                count++;
+            }
+        }
+    }
+}
