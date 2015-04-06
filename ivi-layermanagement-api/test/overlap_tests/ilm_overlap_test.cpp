@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <time.h>
+#include <fstream>
 
 
 #include "../TestBase.h"
@@ -198,6 +199,11 @@ public:
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetSourceRectangle");
             vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetRenderOrder);
             vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetRenderOrder");
+
+            if (IlmOverlapTest::configurationFileName.size() != 0)
+            {
+                readFileSet(IlmOverlapTest::configurationFileName);
+            }
     }
 
     void TearDown()
@@ -616,6 +622,44 @@ public:
         timesCalled++;
 
         pthread_cond_signal( &waiterVariable );
+    }
+
+    static bool readFileSet(std::string &fileName)
+    {
+        std::string line;
+        std::ifstream myfile(fileName.c_str());
+
+        std::cout << "Parsing " << fileName << std::endl;
+
+        if (myfile.is_open())
+        {
+            while ( !myfile.eof() )
+            {
+                getline (myfile,line);
+
+                if (line.find("#") == std::string::npos)
+                {
+                    std::vector<std::string>::iterator iter = std::find(vectorOfTestNames.begin(),
+                                  vectorOfTestNames.end(),
+                                  line);
+                    if (iter != vectorOfTestNames.end())
+                    {
+                        uint index = std::distance(vectorOfTestNames.begin(), iter);
+
+                        vectorOfTestSet.push_back(vectorOfTests[index]);
+                    }
+                    else
+                    {
+                        std::cout << "Can't find: " << line << std::endl;
+                    }
+                }
+            }
+            myfile.close();
+        }
+        else
+        {
+            std::cout << "Couldn't open file: " << fileName << std::endl;
+        }
     }
 
     void IlmOverlapTest_ilm_overlapGetPropertiesOfSurface()
@@ -2046,7 +2090,7 @@ std::vector<std::string> IlmOverlapTest::vectorOfTestNames;
 std::vector<void(IlmOverlapTest::*)(void)> IlmOverlapTest::vectorOfTestSet;
 bool IlmOverlapTest::randomize;
 int IlmOverlapTest::no_iterations;
-std::string configurationFileName;
+std::string IlmOverlapTest::configurationFileName;
 
 TEST_F(IlmOverlapTest, ilm_overlapRun)
 {
