@@ -2161,3 +2161,177 @@ TEST_F(IlmOverlapTest, ilm_overlapRun)
         }
     }
 }
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+
+    bool exit_fail = false;
+    IlmOverlapTest::randomize = false;
+    IlmOverlapTest::no_iterations = 1;
+
+    std::cout << "Number of parameters: " << argc << std::endl;
+
+    while ((argc > 1) && (argv[1][0] == '-') && (argv[1][1] == '-'))
+    {
+        switch (argv[1][2])
+        {
+            case 'l':
+                {
+                    std::string layerID(&argv[1][3]);
+                    std::istringstream iss(layerID);
+                    unsigned int ID;
+                    iss >> ID;
+                    if (!iss.fail())
+                    {
+                        TestBase::setStartLayerId(ID);
+                        std::cout << "Starting Layer ID set to: "
+                                  << ID << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid layer start parameter"
+                                           << std::endl;
+                    }
+                }
+            break;
+            case 's':
+                {
+                    std::string surfaceID(&argv[1][3]);
+                    std::istringstream iss(surfaceID);
+                    unsigned short int ID;
+                    iss >> ID;
+                    if (!iss.fail())
+                    {
+                        TestBase::setStartSurfaceId(ID);
+                        std::cout << "Starting Surface ID set to: "
+                                  << ID << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid surface start parameter"
+                                           << std::endl;
+                    }
+                }
+           break;
+           case 'n':
+                {
+                    std::string layers(&argv[1][3]);
+                    std::istringstream iss(layers);
+                    unsigned short int maxNumberLayers;
+                    iss >> maxNumberLayers;
+                    if (!iss.fail())
+                    {
+                        TestBase::setMaxLayerIds(maxNumberLayers);
+                        std::cout << "Maximum number of contiguous layers "
+                                  << "set to: " << maxNumberLayers
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid maximum layer parameter"
+                                           << std::endl;
+                    }
+                }
+            break;
+            case 't':
+                {
+                    std::string surfaces(&argv[1][3]);
+                    std::istringstream iss(surfaces);
+                    unsigned short int maxNumberSurfaces;
+                    iss >> maxNumberSurfaces;
+                    if (!iss.fail())
+                    {
+                        TestBase::setMaxSurfaceIds(maxNumberSurfaces);
+                        std::cout << "Maximum number of contiguous surfaces "
+                                  << "set to: " << maxNumberSurfaces
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid maximum surface "
+                                           << "parameter" << std::endl;
+                    }
+                }
+            break;
+            case 'f':
+                {
+                    std::string testFileSet(&argv[1][3]);
+                    FILE *file = fopen(testFileSet.c_str(), "r");
+
+                    if (file)
+                    {
+                        fclose(file);
+                        IlmOverlapTest::configurationFileName = testFileSet;
+                        std::cout << "Read test set from file "
+                                  << testFileSet
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Filename not valid/accessible, "
+                                           << "parameter: "
+                                           << testFileSet << std::endl;
+                    }
+                }
+            break;
+            case 'r':
+                {
+                    IlmOverlapTest::randomize = true;
+                    std::cout << "Randomization set" << std::endl;
+                }
+            break;
+            case 'i':
+                {
+                    std::string itrs(&argv[1][3]);
+                    std::istringstream iss(itrs);
+                    int iterations;
+                    iss >> iterations;
+                    if (!iss.fail())
+                    {
+                        IlmOverlapTest::no_iterations = iterations;
+                        std::cout << "Number of iterations "
+                                  << "set to: " << iterations
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid iterations "
+                                           << "parameter" << std::endl;
+                    }
+                }
+            break;
+            default:
+            {
+                 EXPECT_TRUE(false) << "Unknown parameter specified: "
+                                    << argv[1][3] << std::endl;
+                 EXPECT_TRUE(false) << "Options: --l<starting layer id>"
+                                       << std::endl
+                                    << "         --s<starting surface id>"
+                                       << std::endl
+                                    << "         --n<number of layers to be used>"
+                                       << std::endl
+                                    << "         --t<number of surfaces to be used>"
+                                       << std::endl
+                                    << "         --f<test configuration file>"
+                                       << std::endl
+                                    << "         --r<random test selection>"
+                                       << std::endl
+                                    << "         --i<number of iterations>"
+                                       << std::endl;
+                 exit_fail = true;
+            }
+        }
+
+        ++argv;
+        --argc;
+    }
+
+    if (exit_fail)
+    {
+        exit (EXIT_FAILURE);
+    }
+    else
+    {
+        return RUN_ALL_TESTS();
+    }
+}
