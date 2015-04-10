@@ -1,0 +1,2337 @@
+/***************************************************************************
+ *
+ * Copyright 2015 Codethink Ltd
+ * Copyright 2010-2014 BMW Car IT GmbH
+ *
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ ****************************************************************************/
+
+#include <gtest/gtest.h>
+#include <stdio.h>
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <pthread.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <assert.h>
+#include <sstream>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <stdlib.h>
+#include <algorithm>
+#include <time.h>
+#include <fstream>
+
+
+#include "../TestBase.h"
+
+extern "C" {
+    #include "ilm_client.h"
+    #include "ilm_control.h"
+}
+
+const void add_n_secs(struct timespec *tv, long nsec)
+{
+   assert(nsec < 1000000000);
+
+   tv->tv_nsec += nsec;
+   if (tv->tv_nsec >= 1000000000)
+   {
+      tv->tv_nsec -= 1000000000;
+      tv->tv_sec++;
+   }
+}
+
+/* Tests with callbacks
+ * For each test first set the global variables to point to where parameters of the callbacks are supposed to be placed.
+ */
+static pthread_mutex_t notificationMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  waiterVariable = PTHREAD_COND_INITIALIZER;
+static int timesCalled=0;
+
+struct surface_def {
+    t_ilm_surface requestedSurfaceId;
+    t_ilm_surface returnedSurfaceId;
+    ilmSurfaceProperties surfaceProperties;
+    bool notificationState;
+};
+
+struct layer_def {
+    t_ilm_layer layerId;
+    ilmLayerProperties layerProperties;
+    bool notificationState;
+    std::vector<t_ilm_surface> surfacesOnLayer;
+};
+
+class IlmOverlapTest : public TestBase, public ::testing::Test {
+
+    class PthreadMutexLock {
+    private:
+        pthread_mutex_t &mutex_;
+
+        PthreadMutexLock(const PthreadMutexLock&);
+        PthreadMutexLock& operator=(const PthreadMutexLock&);
+
+    public:
+        explicit PthreadMutexLock(pthread_mutex_t &mutex): mutex_(mutex) {
+            pthread_mutex_lock(&mutex_);
+        }
+        ~PthreadMutexLock() {
+            pthread_mutex_unlock(&mutex_);
+        }
+    };
+
+public:
+
+    t_ilm_uint layer;
+
+    // Pointers where to put received values for current Test
+    static t_ilm_layer callbackLayerId;
+    static t_ilm_surface callbackSurfaceId;
+    static struct ilmLayerProperties LayerProperties;
+    static unsigned int mask;
+    static t_ilm_surface surface;
+    static ilmSurfaceProperties SurfaceProperties;
+
+    std::vector<layer_def> layers_allocated;
+    std::vector<surface_def> surfaces_allocated;
+    std::vector<t_ilm_layer> layer_render_order;
+    std::vector<t_ilm_surface> surface_render_order;
+    std::vector<t_ilm_uint> v_screenID;
+    static std::vector<void(IlmOverlapTest::*)(void)> vectorOfTests;
+    static std::vector<std::string> vectorOfTestNames;
+    static std::vector<void(IlmOverlapTest::*)(void)> vectorOfTestSet;
+
+    static const uint no_formats = 7;
+    static const uint no_surfaces = 7;
+    static const uint no_layers = 4;
+    static const uint no_orientations = 4;
+
+    static const ilmPixelFormat pixelFormats[no_formats];
+
+    static const e_ilmOrientation orientation[no_orientations];
+
+    static bool randomize;
+    static int no_iterations;
+    static std::string configurationFileName;
+
+    IlmOverlapTest() : TestBase()
+    {
+        if (initTests())
+        {
+            initSurfaces(__LINE__);
+            initLayers(__LINE__);
+            srand(time(NULL));
+        }
+    }
+
+    ~IlmOverlapTest()
+    {
+        removeAll(__LINE__);
+    }
+
+    void SetUp()
+    {
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetPropertiesOfSurface);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetPropertiesOfSurface");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetDimension);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetDimension");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetVisibility);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetVisibility");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetSourceRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetSourceRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetPropertiesOfLayer);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetPropertiesOfLayer");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetScreenIDs);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetScreenIDs");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetLayerIDs);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetLayerIDs");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetLayerIDsOnScreen);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetLayerIDsOnScreen");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetSurfaceIDs);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetSurfaceIDs");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapGetSurfaceIDsOnLayer);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapGetSurfaceIDsOnLayer");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetOrientation);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetOrientation");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetOrientation);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetOrientation");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetVisibility);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetVisibility");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetDestinationRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetDestinationRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetOrientation);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetOrientation");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetOrientation);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetOrientation");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetVisibility);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetVisibility");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetVisibility);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetVisibility");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetDestinationRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetDestinationRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerGetSourceRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerGetSourceRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetSourceRectangle);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetSourceRectangle");
+            vectorOfTests.push_back(&IlmOverlapTest::IlmOverlapTest_ilm_overlapLayerSetRenderOrder);
+            vectorOfTestNames.push_back("IlmOverlapTest_ilm_overlapLayerSetRenderOrder");
+
+            if (IlmOverlapTest::configurationFileName.size() != 0)
+            {
+                readFileSet(IlmOverlapTest::configurationFileName);
+            }
+    }
+
+    void TearDown()
+    {
+
+    }
+
+    bool initTests()
+    {
+        bool retval = (ILM_SUCCESS == ilm_initWithNativedisplay((t_ilm_nativedisplay)wlDisplay));
+
+        mask = static_cast<t_ilm_notification_mask>(0);
+        surface = INVALID_ID;
+        timesCalled=0;
+
+        callbackLayerId = INVALID_ID;
+        callbackSurfaceId = INVALID_ID;
+        return (retval);
+    }
+
+    void initSurfaces(uint lineNumber =__LINE__)
+    {
+        // Create surfaces
+        for (uint i = 0; i < no_surfaces; i++)
+        {
+            surface_def * surface = new surface_def;
+            surface->requestedSurfaceId = getSurface();
+            surface->returnedSurfaceId = surface->requestedSurfaceId;
+            surface->surfaceProperties.origSourceWidth = 15 * (i + 1);
+            surface->surfaceProperties.origSourceHeight = 25 * (i + 1);
+
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceCreate((t_ilm_nativehandle)wlSurfaces[i],
+                                         surface->surfaceProperties.origSourceWidth,
+                                         surface->surfaceProperties.origSourceHeight,
+                                         pixelFormats[i % no_formats],
+                                         &(surface->returnedSurfaceId)));
+            surfaces_allocated.push_back(*surface);
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        }
+
+        // Preset surface parameters
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Set dimensions of surfaces
+            t_ilm_uint surf_dim[2] = {surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                                      surfaces_allocated[i].surfaceProperties.origSourceHeight};
+
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetDimension(surfaces_allocated[i].returnedSurfaceId,
+                                              surf_dim));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set position of surfaces
+            t_ilm_uint surf_pos[2] = {20 + (i * 5), 40 + (i * 5)};
+            surfaces_allocated[i].surfaceProperties.sourceX = surf_pos[0];
+            surfaces_allocated[i].surfaceProperties.sourceY = surf_pos[1];
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetPosition(surfaces_allocated[i].returnedSurfaceId,
+                                             surf_pos));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set Orientations of surfaces
+            surfaces_allocated[i].surfaceProperties.orientation
+                = orientation[ i % no_orientations ];
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                                                surfaces_allocated[i].surfaceProperties.orientation));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set Opacity of surfaces
+            surfaces_allocated[i].surfaceProperties.opacity = 1.0;
+
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetOpacity(surfaces_allocated[i].returnedSurfaceId,
+                                            surfaces_allocated[i].surfaceProperties.opacity));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set Visibility
+            surfaces_allocated[i].surfaceProperties.visibility = ILM_TRUE;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                      surfaces_allocated[i].surfaceProperties.visibility));
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set source rectangle
+            surfaces_allocated[i].surfaceProperties.sourceX = 0;
+            surfaces_allocated[i].surfaceProperties.sourceY = 0;
+            surfaces_allocated[i].surfaceProperties.sourceWidth
+                = surfaces_allocated[i].surfaceProperties.origSourceWidth;
+            surfaces_allocated[i].surfaceProperties.sourceHeight
+                = surfaces_allocated[i].surfaceProperties.origSourceHeight;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetSourceRectangle(surfaces_allocated[i].returnedSurfaceId,
+                                                    surfaces_allocated[i].surfaceProperties.sourceX,
+                                                    surfaces_allocated[i].surfaceProperties.sourceY,
+                                                    surfaces_allocated[i].surfaceProperties.sourceWidth,
+                                                    surfaces_allocated[i].surfaceProperties.sourceHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set destination rectangle
+            surfaces_allocated[i].surfaceProperties.destX
+                = surfaces_allocated[i].surfaceProperties.sourceX;
+            surfaces_allocated[i].surfaceProperties.destY
+                = surfaces_allocated[i].surfaceProperties.sourceY;
+            surfaces_allocated[i].surfaceProperties.destWidth
+                = surfaces_allocated[i].surfaceProperties.sourceWidth;
+            surfaces_allocated[i].surfaceProperties.destHeight
+                = surfaces_allocated[i].surfaceProperties.sourceHeight;
+
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetDestinationRectangle(surfaces_allocated[i].returnedSurfaceId,
+                                                         surfaces_allocated[i].surfaceProperties.destX,
+                                                         surfaces_allocated[i].surfaceProperties.destY,
+                                                         surfaces_allocated[i].surfaceProperties.destWidth,
+                                                         surfaces_allocated[i].surfaceProperties.destHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set notificationState
+            surfaces_allocated[i].notificationState = false;
+        }
+    }
+
+    void initLayers(uint lineNumber =__LINE__)
+    {
+        t_ilm_layer idRenderOrder[no_layers];
+
+        // Create layers
+        for (uint i = 0; i < no_layers; i++)
+        {
+            layer_def * layer = new layer_def;
+            layer->layerId = getLayer();
+            idRenderOrder[i] = layer->layerId;
+            layer_render_order.push_back(layer->layerId);
+            layer->layerProperties.origSourceWidth = 200 * (i + 1);
+            layer->layerProperties.origSourceHeight = 240 * (i + 1);
+
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerCreateWithDimension(&(layer->layerId),
+                                                   layer->layerProperties.origSourceWidth,
+                                                   layer->layerProperties.origSourceHeight));
+            layers_allocated.push_back(*layer);
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        }
+
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Set position of layers check callback
+            t_ilm_uint layer_pos[2] = {0, 0};
+            callbackLayerId = layers_allocated[i].layerId;
+            layers_allocated[i].layerProperties.sourceX = layer_pos[0];
+            layers_allocated[i].layerProperties.sourceY = layer_pos[1];
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetPosition(layers_allocated[i].layerId,
+                                           layer_pos));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set Orientations of layer
+            layers_allocated[i].layerProperties.orientation
+                = orientation[ i % no_orientations ];
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetOrientation(layers_allocated[i].layerId,
+                                              layers_allocated[i].layerProperties.orientation));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set Opacity of layers
+            layers_allocated[i].layerProperties.opacity = 1.0;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetOpacity(layers_allocated[i].layerId,
+                      layers_allocated[i].layerProperties.opacity));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Change visibility
+            layers_allocated[i].layerProperties.visibility = ILM_TRUE;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetVisibility(layers_allocated[i].layerId,
+                                         layers_allocated[i].layerProperties.visibility));
+            EXPECT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set source rectangle
+            callbackLayerId = layers_allocated[i].layerId;
+
+            layers_allocated[i].layerProperties.sourceX = 0;
+            layers_allocated[i].layerProperties.sourceY = 0;
+            layers_allocated[i].layerProperties.sourceWidth
+                = layers_allocated[i].layerProperties.origSourceWidth;
+            layers_allocated[i].layerProperties.sourceHeight
+                = layers_allocated[i].layerProperties.origSourceHeight;
+
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetSourceRectangle(layers_allocated[i].layerId,
+                                                  layers_allocated[i].layerProperties.sourceX,
+                                                  layers_allocated[i].layerProperties.sourceY,
+                                                  layers_allocated[i].layerProperties.sourceWidth,
+                                                  layers_allocated[i].layerProperties.sourceHeight));
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set destination rectangle of layers
+            layers_allocated[i].layerProperties.destX = 0;
+            layers_allocated[i].layerProperties.destY = 0;
+            layers_allocated[i].layerProperties.destWidth
+                = layers_allocated[i].layerProperties.sourceWidth;
+            layers_allocated[i].layerProperties.destHeight
+                = layers_allocated[i].layerProperties.sourceHeight;
+
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetDestinationRectangle(layers_allocated[i].layerId,
+                                                       layers_allocated[i].layerProperties.destX,
+                                                       layers_allocated[i].layerProperties.destY,
+                                                       layers_allocated[i].layerProperties.destWidth,
+                                                       layers_allocated[i].layerProperties.destHeight));
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Set notificationState
+            layers_allocated[i].notificationState = false;
+        }
+
+        // Pre-set render order
+        {
+            t_ilm_uint numberOfScreens = 0;
+            t_ilm_uint* screenIDs = NULL;
+            const uint no_layers = layers_allocated.size();
+
+            // Try to get screen IDs using null pointer for numberOfScreens
+            ASSERT_EQ(ILM_FAILED, ilm_getScreenIDs(NULL, &screenIDs));
+
+            // Try to get screen IDs using valid pointer for numberOfScreens
+            ASSERT_EQ(ILM_SUCCESS, ilm_getScreenIDs(&numberOfScreens, &screenIDs));
+
+            //Pre-set screen ID list.
+            v_screenID.assign(screenIDs, screenIDs + numberOfScreens);
+            free(screenIDs);
+
+            EXPECT_TRUE(numberOfScreens>0);
+
+            if (numberOfScreens > 0)
+            {
+                t_ilm_display screen = v_screenID[0];
+                ilmScreenProperties screenProperties;
+
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_displaySetRenderOrder(screen,
+                                                    idRenderOrder,
+                                                    layers_allocated.size()));
+            }
+        }
+
+        // Add surfaces to layers check notifications
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            for (uint j = i * (surfaces_allocated.size() / layers_allocated.size());
+                 j < ((i + 1) * (surfaces_allocated.size() / layers_allocated.size()));
+                 j++)
+            {
+                ASSERT_EQ(ILM_SUCCESS,
+                          ilm_layerAddSurface(layers_allocated[i].layerId,
+                          surfaces_allocated[j].returnedSurfaceId));
+                ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+                layers_allocated[i].surfacesOnLayer.push_back(surfaces_allocated[j].returnedSurfaceId);
+            }
+        }
+    }
+
+    void removeAll(uint lineNumber = __LINE__)
+    {
+        // set default values
+        callbackLayerId = INVALID_ID;
+        t_ilm_layer* layers = NULL;
+        t_ilm_int numLayer=0;
+        EXPECT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&numLayer, &layers));
+        for (t_ilm_int i=0; i<numLayer; i++)
+        {
+            if ( ( layers[i] >= getStartLayerId() )
+                   && ( layers[i] <= getEndLayerId() ) )
+            {
+                EXPECT_EQ( ILM_SUCCESS, ilm_layerRemove( layers[i] ) );
+            }
+        }
+
+        layers_allocated.clear();
+
+        free(layers);
+
+        t_ilm_surface* surfaces = NULL;
+        t_ilm_int numSurfaces=0;
+        EXPECT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&numSurfaces, &surfaces));
+        for (t_ilm_int i=0; i<numSurfaces; i++)
+        {
+            if ( ( surfaces[i] >= getStartSurfaceId() )
+                    && ( layers[i] <= getEndSurfaceId() ) )
+            {
+                EXPECT_EQ( ILM_SUCCESS, ilm_surfaceRemove( surfaces[i] ) );
+            }
+        }
+
+        free(surfaces);
+
+        surfaces_allocated.clear();
+
+        ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+        ASSERT_EQ(ILM_SUCCESS, ilm_destroy());
+    }
+
+    static void assertCallbackcalled(int numberOfExpectedCalls=1, uint lineNumber =__LINE__){
+        static struct timespec theTime;
+        bool retval = false;
+        clock_gettime(CLOCK_REALTIME, &theTime);
+        add_n_secs(&theTime, 500000000);
+        PthreadMutexLock lock(notificationMutex);
+        int status = 0;
+        do {
+            if (numberOfExpectedCalls!=timesCalled) {
+                status = pthread_cond_timedwait( &waiterVariable, &notificationMutex, &theTime);
+            }
+        } while (status!=ETIMEDOUT && numberOfExpectedCalls!=timesCalled);
+
+        // we cannot rely on a timeout as layer callbacks are always called synchronously on ilm_commitChanges()
+        EXPECT_NE(ETIMEDOUT, status);
+        timesCalled=0;
+    }
+
+    static void assertNoCallbackIsCalled(){
+        struct timespec theTime;
+        clock_gettime(CLOCK_REALTIME, &theTime);
+        add_n_secs(&theTime, 500000000);
+        PthreadMutexLock lock(notificationMutex);
+        // assert that we have not been notified
+        ASSERT_EQ(ETIMEDOUT, pthread_cond_timedwait( &waiterVariable, &notificationMutex, &theTime));
+    }
+
+    static void LayerCallbackFunction(t_ilm_layer layer, struct ilmLayerProperties* layerProperties, t_ilm_notification_mask m)
+    {
+        PthreadMutexLock lock(notificationMutex);
+
+        if ((unsigned)m & ILM_NOTIFICATION_VISIBILITY)
+        {
+            LayerProperties.visibility = layerProperties->visibility;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_OPACITY)
+        {
+            LayerProperties.opacity = layerProperties->opacity;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_ORIENTATION)
+        {
+            LayerProperties.orientation = layerProperties->orientation;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_SOURCE_RECT)
+        {
+            LayerProperties.sourceX = layerProperties->sourceX;
+            LayerProperties.sourceY = layerProperties->sourceY;
+            LayerProperties.sourceWidth = layerProperties->sourceWidth;
+            LayerProperties.sourceHeight = layerProperties->sourceHeight;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_DEST_RECT)
+        {
+            LayerProperties.destX = layerProperties->destX;
+            LayerProperties.destY = layerProperties->destY;
+            LayerProperties.destWidth = layerProperties->destWidth;
+            LayerProperties.destHeight = layerProperties->destHeight;
+        }
+
+        EXPECT_TRUE(callbackLayerId == (unsigned)INVALID_ID || callbackLayerId == layer);
+        callbackLayerId = layer;
+        mask |= (unsigned)m;
+        timesCalled++;
+
+        pthread_cond_signal( &waiterVariable );
+    }
+
+    static void SurfaceCallbackFunction(t_ilm_surface surface, struct ilmSurfaceProperties* surfaceProperties, t_ilm_notification_mask m)
+    {
+        PthreadMutexLock lock(notificationMutex);
+
+        if ((unsigned)m & ILM_NOTIFICATION_VISIBILITY)
+        {
+            SurfaceProperties.visibility = surfaceProperties->visibility;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_OPACITY)
+        {
+            SurfaceProperties.opacity = surfaceProperties->opacity;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_ORIENTATION)
+        {
+            SurfaceProperties.orientation = surfaceProperties->orientation;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_SOURCE_RECT)
+        {
+            SurfaceProperties.sourceX = surfaceProperties->sourceX;
+            SurfaceProperties.sourceY = surfaceProperties->sourceY;
+            SurfaceProperties.sourceWidth = surfaceProperties->sourceWidth;
+            SurfaceProperties.sourceHeight = surfaceProperties->sourceHeight;
+        }
+
+        if ((unsigned)m & ILM_NOTIFICATION_DEST_RECT)
+        {
+            SurfaceProperties.destX = surfaceProperties->destX;
+            SurfaceProperties.destY = surfaceProperties->destY;
+            SurfaceProperties.destWidth = surfaceProperties->destWidth;
+            SurfaceProperties.destHeight = surfaceProperties->destHeight;
+        }
+
+        EXPECT_TRUE(callbackSurfaceId == (unsigned)INVALID_ID || callbackSurfaceId == surface);
+        callbackSurfaceId = surface;
+        mask |= (unsigned)m;
+        timesCalled++;
+
+        pthread_cond_signal( &waiterVariable );
+    }
+
+    static bool readFileSet(std::string &fileName)
+    {
+        std::string line;
+        std::ifstream myfile(fileName.c_str());
+
+        std::cout << "Parsing " << fileName << std::endl;
+
+        if (myfile.is_open())
+        {
+            while ( !myfile.eof() )
+            {
+                getline (myfile,line);
+
+                if (line.find("#") == std::string::npos)
+                {
+                    std::vector<std::string>::iterator iter = std::find(vectorOfTestNames.begin(),
+                                  vectorOfTestNames.end(),
+                                  line);
+                    if (iter != vectorOfTestNames.end())
+                    {
+                        uint index = std::distance(vectorOfTestNames.begin(), iter);
+
+                        vectorOfTestSet.push_back(vectorOfTests[index]);
+                    }
+                    else
+                    {
+                        std::cout << "Can't find: " << line << std::endl;
+                    }
+                }
+            }
+            myfile.close();
+        }
+        else
+        {
+            std::cout << "Couldn't open file: " << fileName << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapGetPropertiesOfSurface()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmSurfaceProperties returnValue;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &returnValue))
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check opacity
+            EXPECT_NEAR(surfaces_allocated[i].surfaceProperties.opacity,
+                        returnValue.opacity, 0.01)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check source values
+            ASSERT_EQ(returnValue.sourceX,
+                      surfaces_allocated[i].surfaceProperties.sourceX)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceY,
+                      surfaces_allocated[i].surfaceProperties.sourceY)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceWidth,
+                      surfaces_allocated[i].surfaceProperties.sourceWidth)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceHeight,
+                      surfaces_allocated[i].surfaceProperties.sourceHeight)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check destination values
+            ASSERT_EQ(returnValue.sourceX,
+                      surfaces_allocated[i].surfaceProperties.destX)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceY,
+                      surfaces_allocated[i].surfaceProperties.destY)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceWidth,
+                      surfaces_allocated[i].surfaceProperties.destWidth)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+            ASSERT_EQ(returnValue.sourceHeight,
+                      surfaces_allocated[i].surfaceProperties.destHeight)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check orientation value
+            ASSERT_EQ(returnValue.orientation,
+                      surfaces_allocated[i].surfaceProperties.orientation)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+
+            // Check visibility value
+            ASSERT_EQ(returnValue.visibility,
+                      surfaces_allocated[i].surfaceProperties.visibility)
+                              << "Surface Id: "
+                              << surfaces_allocated[i].returnedSurfaceId
+                              << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetDimension()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             t_ilm_uint dimreturned[2] = {0, 0};
+             EXPECT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetDimension(surfaces_allocated[i].returnedSurfaceId,
+                                               dimreturned))
+                                       << "Surface Id: "
+                                       << surfaces_allocated[i].returnedSurfaceId;
+
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceWidth,
+                       dimreturned[0]) << "Surface Id: "
+                                       << surfaces_allocated[i].returnedSurfaceId;
+
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.origSourceHeight,
+                       dimreturned[1]) << "Surface Id: "
+                                       << surfaces_allocated[i].returnedSurfaceId;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetVisibility()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             // Confirm visibility of each surface
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                                &visibility_rtn)) << "Surface: "
+                                                                  << surfaces_allocated[i].returnedSurfaceId;
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                       visibility_rtn)
+                       << "Surface: "  << surfaces_allocated[i].returnedSurfaceId;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceSetSourceRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Confirm source rectangles before change
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm source rectangle for each surface
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                                       << "Surface Id: "
+                                       << surfaces_allocated[i].returnedSurfaceId;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceX,
+                      surfaceProperties.sourceX)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceY,
+                      surfaceProperties.sourceY)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceWidth,
+                      surfaceProperties.sourceWidth)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId
+                      << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceHeight,
+                      surfaceProperties.sourceHeight)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId
+                      << std::endl;
+        }
+
+        if (surfaces_allocated.size() > 0)
+        {
+            // Set random surface index
+            uint random_surface = rand() % surfaces_allocated.size();
+
+            // Create random values
+            t_ilm_uint random_sourceX = rand();
+            t_ilm_uint random_sourceY = rand();
+            t_ilm_uint random_sourceWidth = rand();
+            t_ilm_uint random_sourceHeight = rand();
+
+            // Set callback
+            callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+            // Set source rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetSourceRectangle(surfaces_allocated[random_surface].returnedSurfaceId,
+                                                    random_sourceX,
+                                                    random_sourceY,
+                                                    random_sourceWidth,
+                                                    random_sourceHeight))
+                           << "Surface Id: "
+                               << surfaces_allocated[random_surface].returnedSurfaceId
+                           << ", Source X: " << random_sourceX
+                           << ", Source Y: " << random_sourceY
+                           << ", Source Width: " << random_sourceWidth
+                           << ", Source Height: " << random_sourceHeight << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored source rectangle for surface
+            surfaces_allocated[random_surface].surfaceProperties.sourceX = random_sourceX;
+            surfaces_allocated[random_surface].surfaceProperties.sourceY = random_sourceY;
+            surfaces_allocated[random_surface].surfaceProperties.sourceWidth = random_sourceWidth;
+            surfaces_allocated[random_surface].surfaceProperties.sourceHeight = random_sourceHeight;
+
+            std::cout << "Changing source rectangle for Surface Id: "
+                      << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", to: Source X: " << random_sourceX
+                      << ", Source Y: " << random_sourceY
+                      << ", Source Width: " << random_sourceWidth
+                      << ", Source Height: " << random_sourceHeight << std::endl;
+
+            // Check notification state if set
+            if (surfaces_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Confirm all source rectangles after change
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm source rectangle for each surface
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                                       << "Surface Id: "
+                                       << surfaces_allocated[i].returnedSurfaceId;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceX,
+                      surfaceProperties.sourceX)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceY,
+                      surfaceProperties.sourceY)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceWidth,
+                      surfaceProperties.sourceWidth)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId
+                      << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceHeight,
+                      surfaceProperties.sourceHeight)
+                      << "Surface Id: "
+                          << surfaces_allocated[i].returnedSurfaceId
+                      << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapGetPropertiesOfLayer()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             ilmLayerProperties returnValue;
+             // Check Layer source properties
+             EXPECT_EQ(ILM_SUCCESS,
+                       ilm_getPropertiesOfLayer(layers_allocated[i].layerId, &returnValue))
+                       << "Layer Id: "
+                          << layers_allocated[i].layerId << std::endl;
+
+             // Check opacity
+             EXPECT_NEAR(layers_allocated[i].layerProperties.opacity,
+                         returnValue.opacity,
+                         0.01)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+
+             // Check source values
+             EXPECT_EQ(returnValue.sourceX,
+                       layers_allocated[i].layerProperties.sourceX)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(returnValue.sourceY,
+                       layers_allocated[i].layerProperties.sourceY)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(returnValue.sourceWidth,
+                       layers_allocated[i].layerProperties.sourceWidth)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(returnValue.sourceHeight,
+                       layers_allocated[i].layerProperties.sourceHeight)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+
+             // Check destination values
+             EXPECT_EQ(returnValue.sourceX,
+                       layers_allocated[i].layerProperties.destX)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(returnValue.sourceY,
+                       layers_allocated[i].layerProperties.destY)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(returnValue.sourceWidth,
+                       layers_allocated[i].layerProperties.destWidth)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(returnValue.sourceHeight,
+                       layers_allocated[i].layerProperties.destHeight)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+
+             // Check orientation value
+             EXPECT_EQ(returnValue.orientation,
+                       layers_allocated[i].layerProperties.orientation)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+
+             // Check visibility value
+             EXPECT_EQ(returnValue.visibility,
+                       layers_allocated[i].layerProperties.visibility)
+                         << "Layer Id: "
+                            << layers_allocated[i].layerId << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapGetScreenIDs()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_uint numberOfScreens = 0;
+        t_ilm_uint* screenIDs;
+
+        // Try to get screen IDs using valid pointer for numberOfScreens
+        ASSERT_EQ(ILM_SUCCESS, ilm_getScreenIDs(&numberOfScreens, &screenIDs));
+
+        v_screenID.clear();
+        v_screenID.assign(screenIDs, screenIDs + numberOfScreens);
+        free(screenIDs);
+
+        EXPECT_TRUE(numberOfScreens > 0);
+    }
+
+    void IlmOverlapTest_ilm_overlapGetLayerIDs()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_int length;
+        t_ilm_layer* IDs;
+        std::vector<t_ilm_layer> layerIDs;
+
+        // Get layers
+        ASSERT_EQ(ILM_SUCCESS, ilm_getLayerIDs(&length, &IDs));
+        layerIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through expected layers and confirm they are present
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            EXPECT_NE(std::find(layerIDs.begin(),
+                                layerIDs.end(),
+                                layers_allocated[i].layerId),
+                                layerIDs.end())
+                << "Layer Id: "
+                    << layers_allocated[i].layerId << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapGetLayerIDsOnScreen()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_layer* idGotRenderOrder;
+        t_ilm_int    length = 0;
+        std::vector<t_ilm_layer> layerIDs;
+
+        // This assumes only 1 screen for the moment
+        ASSERT_EQ(ILM_SUCCESS,
+                  ilm_getLayerIDsOnScreen(v_screenID[0],
+                                          &length,
+                                          &idGotRenderOrder))
+            << "Screen Id: " << v_screenID[0] << std::endl;
+
+        layerIDs.assign(idGotRenderOrder, idGotRenderOrder + length);
+        free(idGotRenderOrder);
+
+        // Loop through expected layers and confirm they are present
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             ASSERT_NE(std::find(layerIDs.begin(),
+                                 layerIDs.end(),
+                                 layers_allocated[i].layerId),
+                                 layerIDs.end())
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+        }
+
+        // Check that the number of layers got match those expected.
+        if (layerIDs.size() != layer_render_order.size())
+        {
+            ASSERT_EQ(true, false) << "No of layers retrieved don't match expected"
+                                   << "Got: " << layerIDs.size() << ", "
+                                   << "Expected: " << layer_render_order.size()
+                                   << std::endl;
+        }
+
+        // Check got render order matches that expected
+        for (uint i = 0; i < layerIDs.size(); i++)
+        {
+             ASSERT_EQ(layer_render_order[i], layerIDs[i]);
+        }
+
+        // Clean-up
+        layerIDs.clear();
+    }
+
+    void IlmOverlapTest_ilm_overlapGetSurfaceIDs()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_int length;
+        t_ilm_surface* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        // Get surfaces
+        ASSERT_EQ(ILM_SUCCESS, ilm_getSurfaceIDs(&length, &IDs));
+        surfaceIDs.assign(IDs, IDs + length);
+        free(IDs);
+
+        // Loop through expected surfaces and confirm they are present
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             EXPECT_NE(std::find(surfaceIDs.begin(),
+                                 surfaceIDs.end(),
+                                 surfaces_allocated[i].returnedSurfaceId),
+                                 surfaceIDs.end())
+                           << "Surface Id: "
+                           << surfaces_allocated[i].returnedSurfaceId;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapGetSurfaceIDsOnLayer()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+        t_ilm_int length;
+        t_ilm_uint* IDs;
+        std::vector<t_ilm_surface> surfaceIDs;
+
+        // Loop through expected layers and confirm they are present
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getSurfaceIDsOnLayer(layers_allocated[i].layerId,
+                                               &length,
+                                               &IDs))
+                          << "Layer Id: "
+                               << layers_allocated[i].layerId << std::endl;
+            surfaceIDs.assign(IDs, IDs + length);
+            free(IDs);
+
+            // Check to make sure that all the expected surfaces are assigned.
+            if (surfaceIDs.size() == layers_allocated[i].surfacesOnLayer.size())
+            {
+                for (uint j = 0; j < surfaceIDs.size(); j++)
+                {
+                     EXPECT_NE(std::find(layers_allocated[i].surfacesOnLayer.begin(),
+                               layers_allocated[i].surfacesOnLayer.end(),
+                               surfaceIDs[j]),
+                               layers_allocated[i].surfacesOnLayer.end())
+                          << "Layer Id: "
+                               << layers_allocated[i].layerId
+                          << ", Surface Id: "
+                               << surfaceIDs[j] << std::endl;
+                }
+            }
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetOrientation()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check Orientations of surfaces
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             ilmOrientation returned;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                       &returned))
+               << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                   << std::endl;
+             ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
+               << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                   << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceSetOrientation()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check Orientations of surfaces
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceGetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                      &returned))
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
+        }
+
+        // Pick random surface and change
+        uint random_surface = rand() % surfaces_allocated.size();
+        e_ilmOrientation random_orientation
+            = orientation[rand() % no_orientations];
+        callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+        if (surfaces_allocated.size() > 0)
+        {
+            // Set a random surface a random orientation
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetOrientation(surfaces_allocated[random_surface].returnedSurfaceId,
+                                                random_orientation))
+                        << "Surface Id: " << surfaces_allocated[random_surface].returnedSurfaceId
+                        << ", Orientation: " << random_orientation << std::endl;
+
+            // Update stored orientation for surface
+            surfaces_allocated[random_surface].surfaceProperties.orientation = random_orientation;
+
+            std::cout << "Changing orientation of Surface Id: "
+                      << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", to: Orientation: " << random_orientation << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Check notification state if set
+            if (surfaces_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Check Orientations of surfaces again
+        // Make sure changing one hasn't modified others
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceGetOrientation(surfaces_allocated[i].returnedSurfaceId,
+                      &returned))
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.orientation, returned)
+                << "Surface Id: " << surfaces_allocated[i].returnedSurfaceId
+                    << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceSetVisibility()
+    {
+        t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             // Confirm visibility of each surface
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                                &visibility_rtn))
+                       << "Surface Id: "
+                           << surfaces_allocated[i].returnedSurfaceId
+                       << std::endl;
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                       visibility_rtn)
+                       << "Surface Id: "
+                           << surfaces_allocated[i].returnedSurfaceId
+                       << std::endl;
+
+        }
+
+        if (surfaces_allocated.size() > 0)
+        {
+            // Set random surface index
+            uint random_surface = rand() % surfaces_allocated.size();
+
+            // Create random value for visibility
+            t_ilm_bool random_visibility = visibility[rand() % 2];
+
+            // Set callback
+            callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+            // Set visibility
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetVisibility(surfaces_allocated[random_surface].returnedSurfaceId,
+                                               random_visibility))
+                      << "Surface Id: "
+                      << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", Visibility: " << random_visibility << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for surface
+            surfaces_allocated[random_surface].surfaceProperties.visibility = random_visibility;
+
+            std::cout << "Changing visibility of Surface Id: "
+                      << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", to: Visibility: " << random_visibility << std::endl;
+
+            // Check notification state if set
+            if (surfaces_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+             // Confirm visibility of each surface after change
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_surfaceGetVisibility(surfaces_allocated[i].returnedSurfaceId,
+                                                &visibility_rtn));
+             EXPECT_EQ(surfaces_allocated[i].surfaceProperties.visibility,
+                       visibility_rtn)
+                       << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                           << std::endl;
+
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetDestinationRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            ilmSurfaceProperties surfaceProperties;
+            // Confirm destination rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destX,
+                      surfaceProperties.destX)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destY,
+                      surfaceProperties.destY)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destWidth,
+                      surfaceProperties.destWidth)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destHeight,
+                      surfaceProperties.destHeight)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceSetDestinationRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Confirm destination rectangles before change
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm destination rectangle for each surface
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destX,
+                      surfaceProperties.destX)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destY,
+                      surfaceProperties.destY)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destWidth,
+                      surfaceProperties.destWidth)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destHeight,
+                      surfaceProperties.destHeight)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+        }
+
+        if (surfaces_allocated.size() > 0)
+        {
+            // Set random surface index
+            uint random_surface = rand() % surfaces_allocated.size();
+
+            // Create random values
+            t_ilm_uint random_destX = rand();
+            t_ilm_uint random_destY = rand();
+            t_ilm_uint random_destWidth = rand();
+            t_ilm_uint random_destHeight = rand();
+
+            // Set callback
+            callbackSurfaceId = surfaces_allocated[random_surface].returnedSurfaceId;
+
+            // Set destination rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_surfaceSetDestinationRectangle(surfaces_allocated[random_surface].returnedSurfaceId,
+                                                         random_destX,
+                                                         random_destY,
+                                                         random_destWidth,
+                                                         random_destHeight))
+                      << "Surface Id: "  << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", Dest X: " << random_destX
+                      << ", Dest Y: " << random_destY
+                      << ", Dest Width: " << random_destWidth
+                      << ", Dest Height: " << random_destHeight << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for surface
+            surfaces_allocated[random_surface].surfaceProperties.destX = random_destX;
+            surfaces_allocated[random_surface].surfaceProperties.destY = random_destY;
+            surfaces_allocated[random_surface].surfaceProperties.destWidth = random_destWidth;
+            surfaces_allocated[random_surface].surfaceProperties.destHeight = random_destHeight;
+
+            std::cout << "Changing destination rectangle for Surface Id: "
+                      << surfaces_allocated[random_surface].returnedSurfaceId
+                      << ", to: Dest X: " << random_destX
+                      << ", Dest Y: " << random_destY
+                      << ", Dest Width: " << random_destWidth
+                      << ", Dest Height: " << random_destHeight << std::endl;
+
+            // Check notification state if set
+            if (surfaces_allocated[random_surface].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Confirm all destination rectangles after change
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm destination rectangle for each surface
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destX,
+                      surfaceProperties.destX)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destY,
+                      surfaceProperties.destY)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destWidth,
+                      surfaceProperties.destWidth)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.destHeight,
+                      surfaceProperties.destHeight)
+                      << "Surface Id: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapSurfaceGetSourceRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < surfaces_allocated.size(); i++)
+        {
+            // Confirm source rectangle
+            ilmSurfaceProperties surfaceProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfSurface(surfaces_allocated[i].returnedSurfaceId,
+                                                 &surfaceProperties))
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceX,
+                      surfaceProperties.sourceX)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceY,
+                      surfaceProperties.sourceY)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceWidth,
+                      surfaceProperties.sourceWidth)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+            ASSERT_EQ(surfaces_allocated[i].surfaceProperties.sourceHeight,
+                      surfaceProperties.sourceHeight)
+                      << "Surface: "  << surfaces_allocated[i].returnedSurfaceId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetOrientation()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check Orientations of layers
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerGetOrientation(layers_allocated[i].layerId,
+                      &returned))
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+        }
+    }
+
+
+    void IlmOverlapTest_ilm_overlapLayerSetOrientation()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check Orientations of layers
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerGetOrientation(layers_allocated[i].layerId,
+                      &returned))
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+        }
+
+        // Pick random layer and change
+        uint random_layer = rand() % layers_allocated.size();
+        e_ilmOrientation random_orientation = orientation[rand() % no_orientations];
+        callbackLayerId = layers_allocated[random_layer].layerId;
+
+        if (layers_allocated.size() > 0)
+        {
+            // Set a random layer a random orientation
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetOrientation(layers_allocated[random_layer].layerId,
+                                              random_orientation))
+                << "Layer Id: " << layers_allocated[random_layer].layerId
+                << ", Orientation: " << random_orientation << std::endl;
+
+            // Update stored orientation for layer
+            layers_allocated[random_layer].layerProperties.orientation
+                = random_orientation;
+
+            std::cout << "Changing orientation for Layer Id: "
+                      << layers_allocated[random_layer].layerId
+                      << ", to: Orientation: "
+                      << random_orientation << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Check Orientations of layers again
+        // Make sure changing one hasn't modified others
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmOrientation returned;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerGetOrientation(layers_allocated[i].layerId,
+                      &returned))
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.orientation, returned)
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetVisibility()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             // Confirm visibility of each layer
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                              &visibility_rtn))
+                           << "Layer Id: "  << layers_allocated[i].layerId
+                               << std::endl;
+             EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                       visibility_rtn)
+                       << "Layer: "  << layers_allocated[i].layerId
+                           << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerSetVisibility()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        t_ilm_bool visibility[2] = {ILM_TRUE, ILM_FALSE};
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             // Confirm visibility of each layer
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                                &visibility_rtn))
+                       << "Layer Id: "  << layers_allocated[i].layerId
+                           << std::endl;
+             EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                       visibility_rtn)
+                       << "Layer Id: "  << layers_allocated[i].layerId
+                           << std::endl;
+
+        }
+
+        if (layers_allocated.size() > 0)
+        {
+            // Set random layer index
+            uint random_layer = rand() % layers_allocated.size();
+
+            // Create random value for visibility
+            t_ilm_bool random_visibility = visibility[rand() % 2];
+
+            // Set callback
+            callbackLayerId = layers_allocated[random_layer].layerId;
+
+            // Set visibility
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetVisibility(layers_allocated[random_layer].layerId,
+                                             random_visibility))
+                       << "Layer Id: "  << layers_allocated[random_layer].layerId
+                       << ", Visibility: " << random_visibility << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for layer
+            layers_allocated[random_layer].layerProperties.visibility = random_visibility;
+
+            std::cout << "Changing visibility for Layer Id: "
+                      << layers_allocated[random_layer].layerId
+                      << ", to: Visibility: "
+                      << random_visibility << std::endl;
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             // Confirm visibility of each layer after change
+             t_ilm_bool visibility_rtn;
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_layerGetVisibility(layers_allocated[i].layerId,
+                                                &visibility_rtn))
+                << "Layer Id: " << layers_allocated[i].layerId << std::endl;
+             EXPECT_EQ(layers_allocated[i].layerProperties.visibility,
+                       visibility_rtn)
+                       << "Layer Id: "  << layers_allocated[i].layerId
+                           << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetDestinationRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            ilmLayerProperties layerProperties;
+            // Confirm destination rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destX,
+                      layerProperties.destX)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destY,
+                      layerProperties.destY)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destWidth,
+                      layerProperties.destWidth)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
+                      layerProperties.destHeight)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerSetDestinationRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Confirm destination rectangles before change
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm destination rectangle for each layer
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destX,
+                      layerProperties.destX)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destY,
+                      layerProperties.destY)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destWidth,
+                      layerProperties.destWidth)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
+                      layerProperties.destHeight)
+                      << "Layer Id: "  << layers_allocated[i].layerId
+                          << std::endl;
+        }
+
+        if (layers_allocated.size() > 0)
+        {
+            // Set random layer index
+            uint random_layer = rand() % layers_allocated.size();
+
+            // Create random values
+            t_ilm_uint random_destX = rand();
+            t_ilm_uint random_destY = rand();
+            t_ilm_uint random_destWidth = rand();
+            t_ilm_uint random_destHeight = rand();
+
+            // Set callback
+            callbackLayerId = layers_allocated[random_layer].layerId;
+
+            // Set destination rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetDestinationRectangle(layers_allocated[random_layer].layerId,
+                                                       random_destX,
+                                                       random_destY,
+                                                       random_destWidth,
+                                                       random_destHeight))
+                      << "Layer Id: "  << layers_allocated[random_layer].layerId
+                      << ", Dest X: " << random_destX
+                      << ", Dest Y: " << random_destY
+                      << ", Dest Width: " << random_destWidth
+                      << ", Dest Height: " << random_destHeight
+                          << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored destination rectangle for layer
+            layers_allocated[random_layer].layerProperties.destX = random_destX;
+            layers_allocated[random_layer].layerProperties.destY = random_destY;
+            layers_allocated[random_layer].layerProperties.destWidth = random_destWidth;
+            layers_allocated[random_layer].layerProperties.destHeight = random_destHeight;
+
+            std::cout << "Changing destination rectangle for Layer Id: "
+                      << layers_allocated[random_layer].layerId
+                      << ", Dest X: " << random_destX
+                      << ", Dest Y: " << random_destY
+                      << ", Dest Width: " << random_destWidth
+                      << ", Dest Height: " << random_destHeight
+                          << std::endl;
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Confirm all destination rectangles after change
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm destination rectangle for each layer
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destX,
+                      layerProperties.destX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destY,
+                      layerProperties.destY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destWidth,
+                      layerProperties.destWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.destHeight,
+                      layerProperties.destHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerGetSourceRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm source rectangle
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceX,
+                      layerProperties.sourceX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceY,
+                      layerProperties.sourceY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceWidth,
+                      layerProperties.sourceWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceHeight,
+                      layerProperties.sourceHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerSetSourceRectangle()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Confirm layer rectangles before change
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm source rectangle for each layer
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceX,
+                      layerProperties.sourceX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceY,
+                      layerProperties.sourceY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceWidth,
+                      layerProperties.sourceWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceHeight,
+                      layerProperties.sourceHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+        }
+
+        if (layers_allocated.size() > 0)
+        {
+            // Set random layer index
+            uint random_layer = rand() % layers_allocated.size();
+
+            // Create random values
+            t_ilm_uint random_sourceX = rand();
+            t_ilm_uint random_sourceY = rand();
+            t_ilm_uint random_sourceWidth = rand();
+            t_ilm_uint random_sourceHeight = rand();
+
+            // Set callback
+            callbackLayerId = layers_allocated[random_layer].layerId;
+
+            // Set source rectangle
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_layerSetSourceRectangle(layers_allocated[random_layer].layerId,
+                                                  random_sourceX,
+                                                  random_sourceY,
+                                                  random_sourceWidth,
+                                                  random_sourceHeight))
+                      << "Layer: "  << layers_allocated[random_layer].layerId
+                      << ", Source X: " << random_sourceX
+                      << ", Source Y: " << random_sourceY
+                      << ", Source Width: " << random_sourceWidth
+                      << ", Source Height: " << random_sourceHeight
+                          << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            // Update stored orientation for layer
+            layers_allocated[random_layer].layerProperties.sourceX = random_sourceX;
+            layers_allocated[random_layer].layerProperties.sourceY = random_sourceY;
+            layers_allocated[random_layer].layerProperties.sourceWidth = random_sourceWidth;
+            layers_allocated[random_layer].layerProperties.sourceHeight = random_sourceHeight;
+
+            std::cout << "Changing source rectangle for Layer Id: "
+                      << layers_allocated[random_layer].layerId
+                      << ", Source X: " << random_sourceX
+                      << ", Source Y: " << random_sourceY
+                      << ", Source Width: " << random_sourceWidth
+                      << ", Source Height: " << random_sourceHeight
+                          << std::endl;
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled();
+            }
+        }
+
+        // Confirm all source rectangles after change
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+            // Confirm source rectangle for each layer
+            ilmLayerProperties layerProperties;
+            ASSERT_EQ(ILM_SUCCESS,
+                      ilm_getPropertiesOfLayer(layers_allocated[i].layerId,
+                                               &layerProperties))
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceX,
+                      layerProperties.sourceX)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceY,
+                      layerProperties.sourceY)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceWidth,
+                      layerProperties.sourceWidth)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+            ASSERT_EQ(layers_allocated[i].layerProperties.sourceHeight,
+                      layerProperties.sourceHeight)
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+        }
+    }
+
+    void IlmOverlapTest_ilm_overlapLayerSetRenderOrder()
+    {
+        std::cout << "Running: " << __FUNCTION__ << std::endl;
+
+        // Check current render order matches expected
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             t_ilm_int length;
+             t_ilm_uint* IDs;
+             std::vector<t_ilm_surface> gotSurfaces;
+
+             // Get surfaces on layer and set local vector
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_getSurfaceIDsOnLayer(layers_allocated[i].layerId,
+                                                &length, &IDs))
+                      << "Layer: "  << layers_allocated[i].layerId
+                          << std::endl;
+             gotSurfaces.assign(IDs, IDs + length);
+             free(IDs);
+
+             // Set local reference for surfaces on layer
+             std::vector<t_ilm_surface>& surfaces
+                 = layers_allocated[i].surfacesOnLayer;
+
+             // Check for mismatch in sizes
+             if (surfaces.size() != gotSurfaces.size())
+             {
+                 std::cout << "Mismatch between got render order and expected"
+                           << std::endl;
+                 std::cout << "Expected render order" << std::endl;
+                 for (uint j = 0; j < surfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << surfaces[j] << std::endl;
+                 }
+                 std::cout << "Got render order" << std::endl;
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << gotSurfaces[j] << std::endl;
+                 }
+             }
+             else
+             {
+                 // Check for individual differences
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      EXPECT_EQ(surfaces[j], gotSurfaces[j])
+                                << "Mismatch between got render order and "
+                                   "expected" << std::endl;
+                 }
+             }
+        }
+
+        // Re-order render order
+        {
+            // Pick a random layer to change the render order on
+            int random_layer = rand() % layers_allocated.size();
+
+            // Get local copy reference to surfaces on selected layer
+            std::vector<t_ilm_surface>& surfacesOnRandomLayer
+                = layers_allocated[random_layer].surfacesOnLayer;
+
+            // Set constant for number of surfaces to be considered
+            const uint noSurfaces = surfacesOnRandomLayer.size();
+
+            // Shuffle the order
+            std::random_shuffle(surfacesOnRandomLayer.begin(),
+                                surfacesOnRandomLayer.end());
+
+            // Set a render order array
+            t_ilm_uint* renderOrderIDs = &surfacesOnRandomLayer[0];
+
+            // Create an illustrative string of the set order
+            std::string surfaceOrderList;
+            std::ostringstream convert;
+
+            for (uint i = 0; i < noSurfaces; i++)
+            {
+                 convert << renderOrderIDs[i];
+                 surfaceOrderList = surfaceOrderList + convert.str() + " ";
+            }
+
+            // Set the render order
+            EXPECT_EQ(ILM_SUCCESS,
+                      ilm_layerSetRenderOrder(layers_allocated[random_layer].layerId,
+                                              renderOrderIDs, noSurfaces))
+                          << "Layer: "  << layers_allocated[random_layer].layerId
+                          << "Surface Order: " << surfaceOrderList
+                          << std::endl;
+
+            ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+
+            std::cout << "Set render order for Layer Id: "
+                      << layers_allocated[random_layer].layerId
+                      << ", to Surface Set: " << surfaceOrderList << std::endl;
+
+            // Check notification state if set
+            if (layers_allocated[random_layer].notificationState)
+            {
+                assertCallbackcalled(noSurfaces);
+            }
+        }
+
+        // Re-check current render order matches expected
+        for (uint i = 0; i < layers_allocated.size(); i++)
+        {
+             t_ilm_int length;
+             t_ilm_surface* IDs;
+             std::vector<t_ilm_surface> gotSurfaces;
+
+             // Get surfaces on layer and set local vector
+             ASSERT_EQ(ILM_SUCCESS,
+                       ilm_getSurfaceIDsOnLayer(layers_allocated[i].layerId,
+                                                &length, &IDs))
+                              << "Layer: "  << layers_allocated[i].layerId
+                              << std::endl;
+             gotSurfaces.assign(IDs, IDs + length);
+             free(IDs);
+
+             // Set local reference for surfaces on layer
+             std::vector<t_ilm_surface>& surfaces
+                 = layers_allocated[i].surfacesOnLayer;
+
+             // Check for mismatch in sizes
+             if (surfaces.size() != gotSurfaces.size())
+             {
+                 std::cout << "Mismatch between got render order and expected"
+                           << std::endl;
+                 std::cout << "Expected render order" << std::endl;
+                 for (uint j = 0; j < surfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << surfaces[j] << std::endl;
+                 }
+                 std::cout << "Got render order" << std::endl;
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      std::cout << "Surface: " << gotSurfaces[j] << std::endl;
+                 }
+             }
+             else
+             {
+                 // Check for individual differences
+                 for (uint j = 0; j < gotSurfaces.size(); j++)
+                 {
+                      EXPECT_EQ(surfaces[j], gotSurfaces[j])
+                                << "Mismatch between got render order and expected"
+                                << std::endl;
+                 }
+             }
+        }
+    }
+};
+
+// Pointers where to put received values for current Test
+t_ilm_layer IlmOverlapTest::callbackLayerId;
+t_ilm_surface IlmOverlapTest::callbackSurfaceId;
+struct ilmLayerProperties IlmOverlapTest::LayerProperties;
+unsigned int IlmOverlapTest::mask;
+t_ilm_surface IlmOverlapTest::surface;
+ilmSurfaceProperties IlmOverlapTest::SurfaceProperties;
+
+const ilmPixelFormat IlmOverlapTest::pixelFormats[no_formats] = {ILM_PIXELFORMAT_RGBA_4444,
+                                                                 ILM_PIXELFORMAT_RGBA_5551,
+                                                                 ILM_PIXELFORMAT_RGBA_6661,
+                                                                 ILM_PIXELFORMAT_RGBA_8888,
+                                                                 ILM_PIXELFORMAT_RGB_565,
+                                                                 ILM_PIXELFORMAT_RGB_888,
+                                                                 ILM_PIXELFORMAT_R_8};
+
+const e_ilmOrientation IlmOverlapTest::orientation[no_orientations] = {ILM_ZERO,
+                                                                       ILM_NINETY,
+                                                                       ILM_ONEHUNDREDEIGHTY,
+                                                                       ILM_TWOHUNDREDSEVENTY};
+
+std::vector<void(IlmOverlapTest::*)(void)> IlmOverlapTest::vectorOfTests;
+std::vector<std::string> IlmOverlapTest::vectorOfTestNames;
+std::vector<void(IlmOverlapTest::*)(void)> IlmOverlapTest::vectorOfTestSet;
+bool IlmOverlapTest::randomize;
+int IlmOverlapTest::no_iterations;
+std::string IlmOverlapTest::configurationFileName;
+
+TEST_F(IlmOverlapTest, ilm_overlapRun)
+{
+    uint count = 0;
+
+    // Note for infinity if no_iterations goes negative
+    // the while loop cases will never end.
+
+    // Check if a valid test set has been configured
+    if (vectorOfTestSet.size() == 0)
+    {
+        // Check for random selection from all tests
+        if (randomize)
+        {
+            // Check if the number of expected iterations have been reached
+            while (count != no_iterations)
+            {
+                // Access a random test function
+                (this->*vectorOfTests[rand() % vectorOfTests.size()])();
+                count++;
+            }
+        }
+        else
+        {
+            // Iterate through all tests a number of times
+            while (count != no_iterations)
+            {
+                // Iterate through all tests
+                for (uint i = 0; i < vectorOfTests.size(); i++)
+                {
+                    // Access next test in sequence
+                    (this->*vectorOfTests[i])();
+                }
+
+                // Increment iteration counter
+                count++;
+            }
+        }
+    }
+    else
+    {
+        // Check for random selection from specified test set
+        if (randomize)
+        {
+            // Check if the required number of random selections is met.
+            while (count != no_iterations)
+            {
+                // Accees a random test function from the requested set
+                (this->*vectorOfTestSet[rand() % vectorOfTestSet.size()])();
+                count++;
+            }
+        }
+        else
+        {
+            // Iterate through all tests in the selected set a number of times
+            while (count != no_iterations)
+            {
+                // Iterate through all tests
+                for (uint i = 0; i < vectorOfTestSet.size(); i++)
+                {
+                    // Access next test in sequence
+                    (this->*vectorOfTestSet[i])();
+                }
+
+                // Increment iteration counter
+                count++;
+            }
+        }
+    }
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+
+    bool exit_fail = false;
+    IlmOverlapTest::randomize = false;
+    IlmOverlapTest::no_iterations = 1;
+
+    std::cout << "Number of parameters: " << argc << std::endl;
+
+    while ((argc > 1) && (argv[1][0] == '-') && (argv[1][1] == '-'))
+    {
+        switch (argv[1][2])
+        {
+            case 'l':
+                {
+                    std::string layerID(&argv[1][3]);
+                    std::istringstream iss(layerID);
+                    unsigned int ID;
+                    iss >> ID;
+                    if (!iss.fail())
+                    {
+                        TestBase::setStartLayerId(ID);
+                        std::cout << "Starting Layer ID set to: "
+                                  << ID << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid layer start parameter"
+                                           << std::endl;
+                    }
+                }
+            break;
+            case 's':
+                {
+                    std::string surfaceID(&argv[1][3]);
+                    std::istringstream iss(surfaceID);
+                    unsigned short int ID;
+                    iss >> ID;
+                    if (!iss.fail())
+                    {
+                        TestBase::setStartSurfaceId(ID);
+                        std::cout << "Starting Surface ID set to: "
+                                  << ID << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid surface start parameter"
+                                           << std::endl;
+                    }
+                }
+           break;
+           case 'n':
+                {
+                    std::string layers(&argv[1][3]);
+                    std::istringstream iss(layers);
+                    unsigned short int maxNumberLayers;
+                    iss >> maxNumberLayers;
+                    if (!iss.fail())
+                    {
+                        TestBase::setMaxLayerIds(maxNumberLayers);
+                        std::cout << "Maximum number of contiguous layers "
+                                  << "set to: " << maxNumberLayers
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid maximum layer parameter"
+                                           << std::endl;
+                    }
+                }
+            break;
+            case 't':
+                {
+                    std::string surfaces(&argv[1][3]);
+                    std::istringstream iss(surfaces);
+                    unsigned short int maxNumberSurfaces;
+                    iss >> maxNumberSurfaces;
+                    if (!iss.fail())
+                    {
+                        TestBase::setMaxSurfaceIds(maxNumberSurfaces);
+                        std::cout << "Maximum number of contiguous surfaces "
+                                  << "set to: " << maxNumberSurfaces
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid maximum surface "
+                                           << "parameter" << std::endl;
+                    }
+                }
+            break;
+            case 'f':
+                {
+                    std::string testFileSet(&argv[1][3]);
+                    FILE *file = fopen(testFileSet.c_str(), "r");
+
+                    if (file)
+                    {
+                        fclose(file);
+                        IlmOverlapTest::configurationFileName = testFileSet;
+                        std::cout << "Read test set from file "
+                                  << testFileSet
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Filename not valid/accessible, "
+                                           << "parameter: "
+                                           << testFileSet << std::endl;
+                    }
+                }
+            break;
+            case 'r':
+                {
+                    IlmOverlapTest::randomize = true;
+                    std::cout << "Randomization set" << std::endl;
+                }
+            break;
+            case 'i':
+                {
+                    std::string itrs(&argv[1][3]);
+                    std::istringstream iss(itrs);
+                    int iterations;
+                    iss >> iterations;
+                    if (!iss.fail())
+                    {
+                        IlmOverlapTest::no_iterations = iterations;
+                        std::cout << "Number of iterations "
+                                  << "set to: " << iterations
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        EXPECT_TRUE(false) << "Invalid iterations "
+                                           << "parameter" << std::endl;
+                    }
+                }
+            break;
+            default:
+            {
+                 EXPECT_TRUE(false) << "Unknown parameter specified: "
+                                    << argv[1][3] << std::endl;
+                 EXPECT_TRUE(false) << "Options: --l<starting layer id>"
+                                       << std::endl
+                                    << "         --s<starting surface id>"
+                                       << std::endl
+                                    << "         --n<number of layers to be used>"
+                                       << std::endl
+                                    << "         --t<number of surfaces to be used>"
+                                       << std::endl
+                                    << "         --f<test configuration file>"
+                                       << std::endl
+                                    << "         --r<random test selection>"
+                                       << std::endl
+                                    << "         --i<number of iterations>"
+                                       << std::endl;
+                 exit_fail = true;
+            }
+        }
+
+        ++argv;
+        --argc;
+    }
+
+    if (exit_fail)
+    {
+        exit (EXIT_FAILURE);
+    }
+    else
+    {
+        return RUN_ALL_TESTS();
+    }
+}
