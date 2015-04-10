@@ -93,6 +93,7 @@ TEST_F(IlmCommandTest, SetGetSurfaceDimension_InvalidInput) {
     t_ilm_uint dim[2] = {15, 25};
 
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceSetDimension(surface, dim));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceGetDimension(surface, dim));
 }
 
@@ -116,6 +117,7 @@ TEST_F(IlmCommandTest, SetGetLayerDimension_InvalidInput) {
     t_ilm_uint dim[2] = {115, 125};
 
     ASSERT_NE(ILM_SUCCESS, ilm_layerSetDimension(layer, dim));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
     ASSERT_NE(ILM_SUCCESS, ilm_layerGetDimension(layer, dim));
 }
 
@@ -138,6 +140,7 @@ TEST_F(IlmCommandTest, SetGetSurfacePosition_InvalidInput) {
     uint surface = 0xdeadbeef;
     t_ilm_uint pos[2] = {15, 25};
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceSetPosition(surface, pos));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceGetPosition(surface, pos));
 }
 
@@ -160,6 +163,7 @@ TEST_F(IlmCommandTest, SetGetLayerPosition_InvalidInput) {
     uint layer = 0xdeadbeef;
     t_ilm_uint pos[2] = {15, 25};
     ASSERT_NE(ILM_SUCCESS, ilm_layerSetPosition(layer, pos));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
     ASSERT_NE(ILM_SUCCESS, ilm_layerGetPosition(layer, pos));
 }
 
@@ -240,6 +244,7 @@ TEST_F(IlmCommandTest, SetGetSurfaceOpacity_InvalidInput) {
     t_ilm_float opacity;
 
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceSetOpacity(surface, 0.88));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceGetOpacity(surface, &opacity));
 }
 
@@ -267,6 +272,7 @@ TEST_F(IlmCommandTest, SetGetLayerOpacity_InvalidInput) {
     t_ilm_float opacity;
 
     ASSERT_NE(ILM_SUCCESS, ilm_layerSetOpacity(layer, 0.88));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
     ASSERT_NE(ILM_SUCCESS, ilm_layerGetOpacity(layer, &opacity));
 }
 
@@ -299,6 +305,7 @@ TEST_F(IlmCommandTest, SetGetSurfaceVisibility_InvalidInput) {
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceGetVisibility(surface, &visibility));
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceSetVisibility(surface, ILM_TRUE));
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceSetVisibility(surface, ILM_FALSE));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
 }
 
 TEST_F(IlmCommandTest, SetGetLayerVisibility) {
@@ -330,6 +337,7 @@ TEST_F(IlmCommandTest, SetGetLayerVisibility_InvalidInput) {
     ASSERT_NE(ILM_SUCCESS, ilm_layerGetVisibility(layer, &visibility));
     ASSERT_NE(ILM_SUCCESS, ilm_layerSetVisibility(layer, ILM_TRUE));
     ASSERT_NE(ILM_SUCCESS, ilm_layerSetVisibility(layer, ILM_FALSE));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
 }
 
 TEST_F(IlmCommandTest, SetSurfaceSourceRectangle) {
@@ -351,6 +359,7 @@ TEST_F(IlmCommandTest, SetSurfaceSourceRectangle) {
 
 TEST_F(IlmCommandTest, SetSurfaceSourceRectangle_InvalidInput) {
     ASSERT_NE(ILM_SUCCESS, ilm_surfaceSetSourceRectangle(0xdeadbeef, 89, 6538, 638, 4));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
 }
 
 TEST_F(IlmCommandTest, ilm_getScreenIDs) {
@@ -535,6 +544,7 @@ TEST_F(IlmCommandTest, ilm_layerCreate_Remove) {
 
 TEST_F(IlmCommandTest, ilm_layerRemove_InvalidInput) {
     ASSERT_NE(ILM_SUCCESS, ilm_layerRemove(0xdeadbeef));
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
 }
 
 TEST_F(IlmCommandTest, ilm_layerRemove_InvalidUse) {
