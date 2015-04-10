@@ -31,14 +31,13 @@ ENDIF()
 
 IF(BUILD_ILM_API_TESTS)
 
-    add_subdirectory( ${CMAKE_CURRENT_SOURCE_DIR}/multi_client )
-
-    PROJECT(ivi-layermanagement-api-test)
+    PROJECT(ivi-layermanagement-api-test-multi)
 
     INCLUDE_DIRECTORIES(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../ilmCommon/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../ilmClient/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../ilmControl/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ilmCommon/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ilmClient/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../ilmControl/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../
         ${WAYLAND_CLIENT_INCLUDE_DIRS}
         ${gtest_INCLUDE_DIRS}
     )
@@ -56,11 +55,8 @@ IF(BUILD_ILM_API_TESTS)
     )
 
     SET(SRC_FILES
-        TestBase.cpp
-        ilm_control_test.cpp
-        ilm_control_notification_test.cpp
-        ilm_control_multi_test.cpp
-        ilm_min_max_invalid_test.cpp
+        ../TestBase.cpp
+        ilm_control_multi_client_test.cpp
     )
 
     ADD_EXECUTABLE(${PROJECT_NAME} ${SRC_FILES})
@@ -79,4 +75,4 @@ IF(BUILD_ILM_API_TESTS)
     ADD_TEST(ilmClient  ${PROJECT_NAME})
     ADD_TEST(ilmControl ${PROJECT_NAME})
 
-ENDIF() 
+ENDIF()
